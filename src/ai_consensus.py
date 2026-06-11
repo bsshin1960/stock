@@ -288,26 +288,61 @@ class AIConsensusManager:
         return results
 
     def calculate_consensus(self, data: dict, ai_results: dict, weights: dict = None) -> dict:
-        """AI 개별 의견들을 가중 결합하여 최종 종합 결과를 산출"""
+        """AI 개별 의견들과 매크로 지표들을 가중 결합하여 최종 종합 결과를 산출"""
+        from src.config import MACRO_WEIGHTS
+        
         if not weights:
             weights = DEFAULT_WEIGHTS
             
         current_price = data["kodex200"]["current_price"]
         
-        weighted_change_pct = 0.0
-        total_weight = 0.0
-        
+        # 1단계: AI 가중 합산
+        weighted_ai_change_pct = 0.0
+        total_ai_weight = 0.0
         for model, res in ai_results.items():
             w = weights.get(model, 0.25)
             change = res["change_pct"]
-            weighted_change_pct += change * w
-            total_weight += w
+            weighted_ai_change_pct += change * w
+            total_ai_weight += w
             
-        # 가중 평균 등락률 산출
-        if total_weight > 0:
-            consensus_change_pct = round(weighted_change_pct / total_weight, 2)
+        if total_ai_weight > 0:
+            ai_consensus_change_pct = weighted_ai_change_pct / total_ai_weight
+        else:
+            ai_consensus_change_pct = 0.0
+            
+        # 2단계: AI Consensus + 매크로 지표 가중 합산
+        m = data["macro"]
+        
+        # 각 매크로 지표 및 AI 컨센서스의 실질 변동률
+        factors = {
+            "AI_Consensus": ai_consensus_change_pct,
+            "Kospi_Future": m["Kospi_Future"]["change_pct"],
+            "Nasdaq_Future": m["Nasdaq_Future"]["change_pct"],
+            "SP500_Future": m["SP500_Future"]["change_pct"],
+            "USD_KRW": m["USD_KRW"]["change_pct"],
+            "USD_JPY": m["USD_JPY"]["change_pct"],
+            "Nikkei_225": m["Nikkei_225"]["change_pct"],
+            "VIX_Index": m["VIX_Index"]["change_pct"],
+            "US10Y_Treasury": m["US10Y_Treasury"]["change_pct"],
+            "WTI_Crude": m["WTI_Crude"]["change_pct"],
+        }
+        
+        final_change_pct = 0.0
+        abs_weight_sum = 0.0
+        
+        for key, val in factors.items():
+            w = MACRO_WEIGHTS.get(key, 0.0)
+            final_change_pct += val * w
+            abs_weight_sum += abs(w)
+            
+        # 가중평균 보정 (부호 방향성에 따른 가감산 후 영향력 절대 비율로 환산)
+        if abs_weight_sum > 0:
+            consensus_change_pct = round(final_change_pct / abs_weight_sum, 2)
         else:
             consensus_change_pct = 0.0
+            
+        # 등락 한도 제한 (-3.0% ~ +3.0%)
+        consensus_change_pct = max(-3.0, min(3.0, consensus_change_pct))
             
         # 예상 가격 계산 (오늘 3시 가격 기준)
         consensus_target_price = int(current_price * (1 + consensus_change_pct / 100))
@@ -316,10 +351,13 @@ class AIConsensusManager:
         # 합의 종합 분석 리포트 생성
         reasons_summary = "   │   ".join([f"{model}: {res['change_pct']}%" for model, res in ai_results.items()])
         
+        macro_weights_desc = f"AI {int(MACRO_WEIGHTS['AI_Consensus']*100)}% │ 코선 {int(MACRO_WEIGHTS['Kospi_Future']*100)}% │ 나선 {int(MACRO_WEIGHTS['Nasdaq_Future']*100)}% │ S&P선 {int(MACRO_WEIGHTS['SP500_Future']*100)}%"
+        
         consensus_reason = (
-            f"주요 4대 AI(Gemini, ChatGPT, Claude, Grok)의 예측치를 가중 종합한 결과, "
-            f"내일 KODEX 200 시초가는 금일 대비 {consensus_change_pct}% 변동한 {consensus_target_price:,}원 부근에서 형성이 유력합니다. "
-            f"대외 거시경제 흐름과 야간 해외선물의 기여도가 가장 높게 작용하였으며, 기술적으로도 20일선 지지/저항이 유효한 시점입니다."
+            f"4대 AI 분석 의견({reasons_summary})과 글로벌 매크로 지표({macro_weights_desc})를 종합 가중 분석한 결론입니다. "
+            f"특히 가중치 {int(MACRO_WEIGHTS['Kospi_Future']*100)}%의 코스피 선물 변동률({m['Kospi_Future']['change_pct']:+.2f}%)과 "
+            f"나스닥 선물 변동률({m['Nasdaq_Future']['change_pct']:+.2f}%)이 최종 예측치를 지배적으로 견인하였으며, "
+            f"내일 KODEX 200 시초가는 금일 대비 {consensus_change_pct:+.2f}% 변동한 {consensus_target_price:,}원 부근 형성이 유력합니다."
         )
         
         return {
