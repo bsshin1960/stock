@@ -289,14 +289,14 @@ class AIConsensusManager:
 
     def calculate_consensus(self, data: dict, ai_results: dict, weights: dict = None) -> dict:
         """AI 개별 의견들과 매크로 지표들을 가중 결합하여 최종 종합 결과를 산출"""
-        from src.config import MACRO_WEIGHTS
+        from src.config import MACRO_WEIGHTS, CONSENSUS_WEIGHTS
         
         if not weights:
             weights = DEFAULT_WEIGHTS
             
         current_price = data["kodex200"]["current_price"]
         
-        # 1단계: AI 가중 합산
+        # 1단계: AI 가중 합산 (전체 중 50% 반영)
         weighted_ai_change_pct = 0.0
         total_ai_weight = 0.0
         for model, res in ai_results.items():
@@ -310,12 +310,11 @@ class AIConsensusManager:
         else:
             ai_consensus_change_pct = 0.0
             
-        # 2단계: AI Consensus + 매크로 지표 가중 합산
+        # 2단계: 글로벌 매크로 지표 가중 합산 (전체 중 30% 반영)
         m = data["macro"]
         
-        # 각 매크로 지표 및 AI 컨센서스의 실질 변동률
+        # 각 매크로 지표의 실질 변동률
         factors = {
-            "AI_Consensus": ai_consensus_change_pct,
             "Kospi_Future": m["Kospi_Future"]["change_pct"],
             "Nasdaq_Future": m["Nasdaq_Future"]["change_pct"],
             "SP500_Future": m["SP500_Future"]["change_pct"],
@@ -327,19 +326,71 @@ class AIConsensusManager:
             "WTI_Crude": m["WTI_Crude"]["change_pct"],
         }
         
-        final_change_pct = 0.0
-        abs_weight_sum = 0.0
+        macro_weighted_sum = 0.0
+        abs_macro_weight_sum = 0.0
         
         for key, val in factors.items():
             w = MACRO_WEIGHTS.get(key, 0.0)
-            final_change_pct += val * w
-            abs_weight_sum += abs(w)
+            macro_weighted_sum += val * w
+            abs_macro_weight_sum += abs(w)
             
-        # 가중평균 보정 (부호 방향성에 따른 가감산 후 영향력 절대 비율로 환산)
-        if abs_weight_sum > 0:
-            consensus_change_pct = round(final_change_pct / abs_weight_sum, 2)
+        if abs_macro_weight_sum > 0:
+            macro_change_pct = macro_weighted_sum / abs_macro_weight_sum
         else:
-            consensus_change_pct = 0.0
+            macro_change_pct = 0.0
+
+        # 3단계: 실시간 속보 뉴스 감성 분석 (전체 중 15% 반영)
+        news_list = data.get("news", [])
+        news_pos_keywords = ["상승", "호재", "급등", "개선", "기대", "돌파", "반등", "활황", "출발", "뛰기", "유입", "안정", "매수세", "순매수"]
+        news_neg_keywords = ["하락", "악재", "급락", "악화", "우려", "위험", "위축", "약세", "피눈물", "감소", "매도세", "순매도", "리스크"]
+        
+        news_pos_cnt = 0
+        news_neg_cnt = 0
+        for text in news_list:
+            for w in news_pos_keywords:
+                if w in text:
+                    news_pos_cnt += 1
+            for w in news_neg_keywords:
+                if w in text:
+                    news_neg_cnt += 1
+                    
+        if news_pos_cnt + news_neg_cnt > 0:
+            news_sentiment = (news_pos_cnt - news_neg_cnt) / (news_pos_cnt + news_neg_cnt)
+        else:
+            news_sentiment = 0.0
+        # 뉴스 감성 지수의 최대 변동 범위를 -1.5% ~ +1.5%로 설정
+        news_change_pct = news_sentiment * 1.5
+        
+        # 4단계: 증권가 소문/이슈 감성 분석 (전체 중 5% 반영)
+        rumors_list = data.get("rumors", [])
+        rumors_pos_keywords = ["상승", "호재", "급등", "개선", "기대", "돌파", "반등", "활황", "수혜", "유입", "안정", "단독", "비둘기", "공급"]
+        rumors_neg_keywords = ["하락", "악재", "급락", "악화", "우려", "위험", "위축", "약세", "피눈물", "매파", "유출", "조정", "악재"]
+        
+        rumor_pos_cnt = 0
+        rumor_neg_cnt = 0
+        for text in rumors_list:
+            for w in rumors_pos_keywords:
+                if w in text:
+                    rumor_pos_cnt += 1
+            for w in rumors_neg_keywords:
+                if w in text:
+                    rumor_neg_cnt += 1
+                    
+        if rumor_pos_cnt + rumor_neg_cnt > 0:
+            rumor_sentiment = (rumor_pos_cnt - rumor_neg_cnt) / (rumor_pos_cnt + rumor_neg_cnt)
+        else:
+            rumor_sentiment = 0.0
+        # 소문 감성 지수의 최대 변동 범위를 -1.0% ~ +1.0%로 설정
+        rumor_change_pct = rumor_sentiment * 1.0
+
+        # 5단계: 최종 종합 가중 합산 (AI 50% + 매크로 30% + 뉴스 15% + 소문 5%)
+        w_ai = CONSENSUS_WEIGHTS.get("AI_Consensus", 0.50)
+        w_macro = CONSENSUS_WEIGHTS.get("Macro_Dashboard", 0.30)
+        w_news = CONSENSUS_WEIGHTS.get("News_Consensus", 0.15)
+        w_rumor = CONSENSUS_WEIGHTS.get("Rumor_Consensus", 0.05)
+
+        consensus_change_pct = (ai_consensus_change_pct * w_ai) + (macro_change_pct * w_macro) + (news_change_pct * w_news) + (rumor_change_pct * w_rumor)
+        consensus_change_pct = round(consensus_change_pct, 2)
             
         # 등락 한도 제한 (-3.0% ~ +3.0%)
         consensus_change_pct = max(-3.0, min(3.0, consensus_change_pct))
@@ -351,12 +402,12 @@ class AIConsensusManager:
         # 합의 종합 분석 리포트 생성
         reasons_summary = "   │   ".join([f"{model}: {res['change_pct']}%" for model, res in ai_results.items()])
         
-        macro_weights_desc = f"AI {int(MACRO_WEIGHTS['AI_Consensus']*100)}% │ 코선 {int(MACRO_WEIGHTS['Kospi_Future']*100)}% │ 나선 {int(MACRO_WEIGHTS['Nasdaq_Future']*100)}% │ S&P선 {int(MACRO_WEIGHTS['SP500_Future']*100)}%"
+        consensus_weights_desc = f"AI {int(w_ai*100)}% │ 매크로 {int(w_macro*100)}% │ 뉴스 {int(w_news*100)}% │ 소문 {int(w_rumor*100)}%"
         
         consensus_reason = (
-            f"4대 AI 분석 의견({reasons_summary})과 글로벌 매크로 지표({macro_weights_desc})를 종합 가중 분석한 결론입니다. "
-            f"특히 가중치 {int(MACRO_WEIGHTS['Kospi_Future']*100)}%의 코스피 선물 변동률({m['Kospi_Future']['change_pct']:+.2f}%)과 "
-            f"나스닥 선물 변동률({m['Nasdaq_Future']['change_pct']:+.2f}%)이 최종 예측치를 지배적으로 견인하였으며, "
+            f"4대 AI 분석 의견({int(w_ai*100)}%), 글로벌 매크로 지표({int(w_macro*100)}%), 실시간 속보 뉴스({int(w_news*100)}%), 증권가 소문/이슈({int(w_rumor*100)}%)를 종합 가중 분석한 결론입니다.\n"
+            f"AI 예측 변동률({ai_consensus_change_pct:+.2f}%), 글로벌 매크로 평균 변동률({macro_change_pct:+.2f}%), "
+            f"실시간 뉴스 분석({news_change_pct:+.2f}%), 소문 감성 지표({rumor_change_pct:+.2f}%)가 반영되었으며,\n"
             f"내일 KODEX 200 시초가는 금일 대비 {consensus_change_pct:+.2f}% 변동한 {consensus_target_price:,}원 부근 형성이 유력합니다."
         )
         

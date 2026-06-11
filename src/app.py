@@ -129,7 +129,7 @@ class StockPredictorApp:
         title_label = ft.Text("KODEX 200 AI Predictor", size=24, weight=ft.FontWeight.BOLD, color="#E0E6ED")
         self.subtitle_label = ft.Text(
             spans=[
-                ft.TextSpan(f"{datetime.datetime.now().strftime('%Y년 %m월 %d일 %H시 %M분')} 기준", style=ft.TextStyle(color="#2196F3", weight=ft.FontWeight.BOLD)),
+                ft.TextSpan(f"{datetime.datetime.now().strftime('%Y년 %m월 %d일 %H시 %M분')} 기준", style=ft.TextStyle(color="#AEEA00", weight=ft.FontWeight.BOLD)),
                 ft.TextSpan(" 한일 선물, 대형주, VIX 공포지수 및 실시간 뉴스/루머를 종합 분석하여 가중치가 반영된 최종 등락을 예측합니다.")
             ],
             size=11,
@@ -142,12 +142,14 @@ class StockPredictorApp:
         self.result_price = ft.Text("", size=13, color="#B0C4DE")
         self.result_diff = ft.Text("", size=13, color="#B0C4DE")
 
-        from src.config import MACRO_WEIGHTS
-        weights_str = f"선물 {int((MACRO_WEIGHTS['Kospi_Future']+MACRO_WEIGHTS['Nasdaq_Future']+MACRO_WEIGHTS['SP500_Future'])*100)}% │ AI {int(MACRO_WEIGHTS['AI_Consensus']*100)}% │ 기타 {int((1-MACRO_WEIGHTS['AI_Consensus']-MACRO_WEIGHTS['Kospi_Future']-MACRO_WEIGHTS['Nasdaq_Future']-MACRO_WEIGHTS['SP500_Future'])*100)}%"
+        weights_str = "AI 50% │ 매크로 30% │ 뉴스 15% │ 소문 5%"
         self.consensus_box = ft.Container(
             content=ft.Column([
                 ft.Row([
-                    ft.Text("최종 종합 예측 결과", size=13, color="#8A99AD", weight=ft.FontWeight.BOLD),
+                    ft.Row([
+                        ft.Icon(ft.Icons.ANALYTICS_ROUNDED, size=16, color="#AEEA00"),
+                        ft.Text("최종 종합 예측 결과", size=13, color="#AEEA00", weight=ft.FontWeight.BOLD),
+                    ], spacing=6),
                     ft.Text(f"가중치: {weights_str}", size=10, color="#8A99AD", italic=True),
                 ], alignment=ft.MainAxisAlignment.SPACE_BETWEEN),
                 ft.Divider(color="#2E3A4E", thickness=1, height=1),
@@ -171,7 +173,7 @@ class StockPredictorApp:
 
         kodex_box = ft.Container(
             content=ft.Column([
-                ft.Row([ft.Icon(ft.Icons.FLAG_CIRCLE_ROUNDED, size=16, color="#FF3D00"), ft.Text("국내 기초자산 및 대형주", size=12, color="#8A99AD", weight=ft.FontWeight.BOLD)], spacing=6),
+                ft.Row([ft.Icon(ft.Icons.FLAG_CIRCLE_ROUNDED, size=16, color="#AEEA00"), ft.Text("국내 기초자산 및 대형주", size=13, color="#AEEA00", weight=ft.FontWeight.BOLD)], spacing=6),
                 ft.Divider(color="#2E3A4E", thickness=1, height=1),
                 ft.Row([self.kodex_price, self.kodex_change], spacing=8),
                 ft.Row([
@@ -209,30 +211,51 @@ class StockPredictorApp:
 
         # ===== 매크로 대시보드 =====
         self.macro_cards = {}
-        macro_items = [("코스피 선물","Kospi_Future"),("나스닥 선물","Nasdaq_Future"),("S&P 500 선물","SP500_Future"),("원/달러 환율","USD_KRW"),("엔/달러 환율","USD_JPY"),("일본 닛케이","Nikkei_225"),("VIX 공포지수","VIX_Index"),("미 10년 국채금리","US10Y_Treasury"),("WTI 국제 유가","WTI_Crude")]
+        macro_items = [
+            ("코스피 선물 (40%)", "Kospi_Future"),
+            ("나스닥 선물 (25%)", "Nasdaq_Future"),
+            ("S&P 500 선물 (15%)", "SP500_Future"),
+            ("원/달러 환율 (5%)", "USD_KRW"),
+            ("엔/달러 환율 (3%)", "USD_JPY"),
+            ("일본 닛케이 (3%)", "Nikkei_225"),
+            ("VIX 공포지수 (2%)", "VIX_Index"),
+            ("미 10년 국채금리 (1%)", "US10Y_Treasury"),
+            ("WTI 국제 유가 (1%)", "WTI_Crude")
+        ]
         mc = []
         for title, key in macro_items:
             c = self._mk_macro_card(title)
             self.macro_cards[key] = c
             mc.append(c)
 
-        # ===== 뉴스/소문 (탭 대신 수동 전환 버튼) =====
+        # ===== 뉴스 및 소문 박스 (좌우 분리) =====
         self.news_lv = ft.ListView(expand=True, spacing=4, padding=5)
         self.rumors_lv = ft.ListView(expand=True, spacing=4, padding=5)
-        self._news_tab_active = True
 
-        self.news_tab_btn = ft.TextButton("실시간 속보 뉴스", style=ft.ButtonStyle(color="#00E676"), on_click=lambda _: self._switch_tab(True))
-        self.rumors_tab_btn = ft.TextButton("증권가 소문/이슈", style=ft.ButtonStyle(color="#8A99AD"), on_click=lambda _: self._switch_tab(False))
-        self.news_content_area = ft.Container(content=self.news_lv, expand=True)
-
-        news_box = ft.Container(
+        self.news_box = ft.Container(
             content=ft.Column([
-                ft.Row([self.news_tab_btn, ft.Text("│", color="#2E3A4E"), self.rumors_tab_btn], spacing=8),
+                ft.Row([
+                    ft.Icon(ft.Icons.ARTICLE_ROUNDED, size=16, color="#AEEA00"),
+                    ft.Text("실시간 속보 뉴스 (15%)", size=13, color="#AEEA00", weight=ft.FontWeight.BOLD),
+                ], spacing=6),
                 ft.Divider(color="#2E3A4E", thickness=1, height=1),
-                self.news_content_area,
+                ft.Container(content=self.news_lv, expand=True),
             ], spacing=4),
             bgcolor="#1A2333", padding=12, border_radius=15,
-            border=ft.Border.all(1, "#2E3A4E"), width=1160, height=170,
+            border=ft.Border.all(1, "#2E3A4E"), width=574, height=170,
+        )
+
+        self.rumor_box = ft.Container(
+            content=ft.Column([
+                ft.Row([
+                    ft.Icon(ft.Icons.RECORD_VOICE_OVER, size=16, color="#AEEA00"),
+                    ft.Text("증권가 소문/이슈 (5%)", size=13, color="#AEEA00", weight=ft.FontWeight.BOLD),
+                ], spacing=6),
+                ft.Divider(color="#2E3A4E", thickness=1, height=1),
+                ft.Container(content=self.rumors_lv, expand=True),
+            ], spacing=4),
+            bgcolor="#1A2333", padding=12, border_radius=15,
+            border=ft.Border.all(1, "#2E3A4E"), width=574, height=170,
         )
 
         # ===== 모니터링 로그 =====
@@ -242,8 +265,8 @@ class StockPredictorApp:
         monitor_box = ft.Container(
             content=ft.Column([
                 ft.Row([
-                    ft.Icon(ft.Icons.MONITOR_HEART_OUTLINED, size=16, color="#00E676"),
-                    ft.Text("모니터링 로그", size=13, color="#8A99AD", weight=ft.FontWeight.BOLD),
+                    ft.Icon(ft.Icons.MONITOR_HEART_OUTLINED, size=16, color="#AEEA00"),
+                    ft.Text("모니터링 로그", size=13, color="#AEEA00", weight=ft.FontWeight.BOLD),
                     ft.Container(expand=True),
                     ft.IconButton(icon=ft.Icons.DELETE_SWEEP_ROUNDED, icon_size=16, icon_color="#8A99AD", tooltip="로그 지우기", on_click=lambda _: self._clear_log()),
                 ], spacing=6),
@@ -265,11 +288,17 @@ class StockPredictorApp:
             ft.Row([
                 self.status_msg,
             ], alignment=ft.MainAxisAlignment.START, width=1160),
-            ft.Text("4대 핵심 AI 가중치 반영 실시간 예측 분석", size=14, color="#8A99AD", weight=ft.FontWeight.BOLD),
+            ft.Row([
+                ft.Icon(ft.Icons.PSYCHOLOGY_ROUNDED, size=16, color="#AEEA00"),
+                ft.Text("4대 핵심 AI 가중치 반영 실시간 예측 분석 (50%)", size=13, color="#AEEA00", weight=ft.FontWeight.BOLD)
+            ], spacing=6),
             ft.Row(controls=[self.ai_cards["Gemini"], self.ai_cards["ChatGPT"], self.ai_cards["Claude"], self.ai_cards["Grok"]], spacing=12),
-            ft.Text("글로벌 선물/공포지수/환율/일본상황 실시간 대시보드", size=14, color="#8A99AD", weight=ft.FontWeight.BOLD),
+            ft.Row([
+                ft.Icon(ft.Icons.PUBLIC_ROUNDED, size=16, color="#AEEA00"),
+                ft.Text("글로벌 선물/공포지수/환율/일본상황 실시간 대시보드 (30%)", size=13, color="#AEEA00", weight=ft.FontWeight.BOLD)
+            ], spacing=6),
             ft.Row(controls=mc, spacing=10),
-            news_box,
+            ft.Row([self.news_box, self.rumor_box], spacing=12),
             monitor_box,
         ], spacing=12, width=1160)
 
@@ -325,18 +354,7 @@ class StockPredictorApp:
         c.data = {"val": lv, "pct": lp}
         return c
 
-    # ─── 탭 전환 ───
-    def _switch_tab(self, news_active):
-        self._news_tab_active = news_active
-        if news_active:
-            self.news_content_area.content = self.news_lv
-            self.news_tab_btn.style = ft.ButtonStyle(color="#00E676")
-            self.rumors_tab_btn.style = ft.ButtonStyle(color="#8A99AD")
-        else:
-            self.news_content_area.content = self.rumors_lv
-            self.news_tab_btn.style = ft.ButtonStyle(color="#8A99AD")
-            self.rumors_tab_btn.style = ft.ButtonStyle(color="#00E676")
-        self.page.update()
+
 
     def _clear_log(self):
         self.monitor_lv.controls.clear()
@@ -483,10 +501,10 @@ class StockPredictorApp:
                 self.result_diff.color = "#00E676"
             else:
                 self.result_status.value = "하락 전망 ▼"
-                self.result_status.color = "#2196F3"
-                self.consensus_box.border = ft.Border.all(2, "#2196F3")
-                self.result_pct.color = "#2196F3"
-                self.result_diff.color = "#2196F3"
+                self.result_status.color = "#AEEA00"
+                self.consensus_box.border = ft.Border.all(2, "#AEEA00")
+                self.result_pct.color = "#AEEA00"
+                self.result_diff.color = "#AEEA00"
 
             self.result_pct.value = f"{cp:+.2f} %"
             self.result_price.value = f"예상 시가: {tp:,} 원"
@@ -496,7 +514,7 @@ class StockPredictorApp:
 
             now_str = datetime.datetime.now().strftime("%Y년 %m월 %d일 %H시 %M분")
             self.subtitle_label.spans = [
-                ft.TextSpan(f"{now_str} 기준", style=ft.TextStyle(color="#2196F3", weight=ft.FontWeight.BOLD)),
+                ft.TextSpan(f"{now_str} 기준", style=ft.TextStyle(color="#AEEA00", weight=ft.FontWeight.BOLD)),
                 ft.TextSpan(" 한일 선물, 대형주, VIX 공포지수 및 실시간 뉴스/루머를 종합 분석하여 가중치가 반영된 최종 등락을 예측합니다.")
             ]
             self.status_msg.value = "분석 완료. [파일 > 보고서 저장]에서 보고서를 내보낼 수 있습니다."
