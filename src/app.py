@@ -590,14 +590,15 @@ class StockPredictorApp:
         is_dark = self.page.theme_mode == ft.ThemeMode.DARK
         accent_color = "#C084FC" if is_dark else "#7C3AED"
         
-        history_link = ft.Text(
-            "적중률 내역",
-            size=10,
-            color=accent_color,
-            style=ft.TextStyle(decoration=ft.TextDecoration.UNDERLINE)
+        history_btn = ft.TextButton(
+            "적중률",
+            style=ft.ButtonStyle(
+                color=accent_color,
+                padding=ft.Padding(left=4, right=4, top=0, bottom=0),
+                text_style=ft.TextStyle(size=10, weight=ft.FontWeight.BOLD)
+            ),
+            on_click=lambda e: self.show_total_ai_history_dialog()
         )
-        history_link.on_click = lambda e, m=model_name: self.show_ai_history_dialog(m)
-        history_link.mouse_cursor = ft.MouseCursor.CLICK
         
         c = ft.Container(
             content=ft.Column([
@@ -606,8 +607,8 @@ class StockPredictorApp:
                         ft.Container(width=10, height=10, bgcolor=color, border_radius=5),
                         ft.Text(display_name, size=13, weight=ft.FontWeight.BOLD, color="#0F172A")
                     ], spacing=6),
-                    history_link
-                ], alignment=ft.MainAxisAlignment.SPACE_BETWEEN),
+                    history_btn
+                ], alignment=ft.MainAxisAlignment.SPACE_BETWEEN, vertical_alignment=ft.CrossAxisAlignment.CENTER),
                 ft.Divider(color="#CBD5E1", thickness=1), lp, lprice,
                 ft.Container(
                     content=ft.Column([lr], scroll=ft.ScrollMode.AUTO, expand=True),
@@ -617,7 +618,7 @@ class StockPredictorApp:
             bgcolor="#FFFFFF", padding=12, border_radius=12, border=ft.Border.all(1, "#78909C"), width=309, height=218,
             on_hover=self.handle_body_hover
         )
-        c.data = {"pct": lp, "price": lprice, "reason": lr, "link": history_link}
+        c.data = {"pct": lp, "price": lprice, "reason": lr, "link": history_btn}
         return c
 
     def _mk_macro_card(self, title):
@@ -751,16 +752,8 @@ class StockPredictorApp:
         )
         self.page.show_dialog(dlg)
 
-    def show_ai_history_dialog(self, model_name: str):
-        history_file = BASE_DIR / "history.json"
-        history = []
-        if history_file.exists():
-            try:
-                with open(history_file, "r", encoding="utf-8") as f:
-                    history = json.load(f)
-            except Exception:
-                pass
-                
+    def _get_ai_history_data(self, model_name: str, history: list) -> tuple:
+        """특정 모델의 히스토리 데이터와 통계(hits, total, rate)를 추출하는 헬퍼 함수"""
         ai_history = []
         for item in history:
             ai_pred = item.get("ai_predictions", {}).get(model_name)
@@ -817,61 +810,104 @@ class StockPredictorApp:
                 })
                 
         ai_history = list(reversed(ai_history))
-        
         verified = [x for x in ai_history if x["result"] in ["적중", "실패"]]
         hits = sum(1 for x in verified if x["result"] == "적중")
         total = len(verified)
         rate = (hits / total * 100) if total > 0 else 0.0
         
+        return ai_history, hits, total, rate
+
+    def show_total_ai_history_dialog(self):
+        history_file = BASE_DIR / "history.json"
+        history = []
+        if history_file.exists():
+            try:
+                with open(history_file, "r", encoding="utf-8") as f:
+                    history = json.load(f)
+            except Exception:
+                pass
+                
         is_dark = self.page.theme_mode == ft.ThemeMode.DARK
         text_color = "#E0E6ED" if is_dark else "#0F172A"
         border_color = "#2E3A4E" if is_dark else "#78909C"
         
-        stats_text = ft.Text(
-            f"적중률: {rate:.1f}% ({hits}/{total}회 적중)" if total > 0 else "적중 이력 없음 (대기 중)",
-            size=14,
-            weight=ft.FontWeight.BOLD,
-            color="#00C853" if rate >= 60 else "#FF1744" if total > 0 else "#8A99AD"
-        )
+        # 1. 4대 AI 적중률 카드 가로 배치
+        models = ["Gemini", "ChatGPT", "Claude", "Grok"]
+        colors = {
+            "Gemini": "#2196F3",
+            "ChatGPT": "#4CAF50",
+            "Claude": "#FF9800",
+            "Grok": "#9C27B0"
+        }
         
-        lv = ft.ListView(expand=True, spacing=6, height=260, width=450)
-        for x in ai_history:
-            d_str = x["date"].split(" ")[0] if " " in x["date"] else x["date"]
-            p_dir = x["predicted_direction"]
-            ch_pct = x["predicted_change_pct"]
-            t_price = x["target_price"]
-            act_open = x["actual_open"]
-            res = x["result"]
+        stats_cards = []
+        for m_name in models:
+            _, m_hits, m_total, m_rate = self._get_ai_history_data(m_name, history)
             
-            dir_text = "상승 ▲" if p_dir == "UP" else "하락 ▼" if p_dir == "DOWN" else "보합"
-            dir_color = "#FF1744" if p_dir == "UP" else "#2979FF" if p_dir == "DOWN" else "#8A99AD"
+            rate_color = "#00C853" if m_rate >= 60 else "#FF1744" if m_total > 0 else "#8A99AD"
             
-            if res == "적중":
-                badge_color = "#00C853"
-                badge_text = "적중"
-            elif res == "실패":
-                badge_color = "#D32F2F"
-                badge_text = "실패"
-            else:
-                badge_color = "#E0A800"
-                badge_text = "대기"
+            stats_cards.append(
+                ft.Container(
+                    content=ft.Column([
+                        ft.Text(m_name, size=11, weight=ft.FontWeight.BOLD, color=colors[m_name]),
+                        ft.Text(f"{m_rate:.1f}%" if m_total > 0 else "-", size=14, weight=ft.FontWeight.BOLD, color=rate_color),
+                        ft.Text(f"({m_hits}/{m_total}회)" if m_total > 0 else "이력 없음", size=9, color="#8A99AD" if is_dark else "#64748B")
+                    ], spacing=2, alignment=ft.MainAxisAlignment.CENTER, horizontal_alignment=ft.CrossAxisAlignment.CENTER),
+                    bgcolor="#111827" if is_dark else "#F9FAFB",
+                    border=ft.Border.all(1, "#1F2937" if is_dark else "#E5E7EB"),
+                    border_radius=8,
+                    width=108,
+                    height=65,
+                    padding=4
+                )
+            )
+            
+        # 2. 리스트 뷰 생성 (날짜별 4대 AI 예측 및 적중 결과 가로 나열)
+        lv = ft.ListView(expand=True, spacing=6, height=240, width=460)
+        
+        for idx in range(len(history)):
+            item = history[len(history) - 1 - idx]
+            d_str = item["date"].split(" ")[0] if " " in item["date"] else item["date"]
+            
+            ai_status_row = []
+            for m_name in models:
+                m_hist, _, _, _ = self._get_ai_history_data(m_name, history)
+                day_pred = next((x for x in m_hist if x["date"] == item["date"]), None)
                 
-            act_str = f"실제: {act_open:,}원" if act_open else "실제: 대기"
+                if day_pred:
+                    p_dir = day_pred["predicted_direction"]
+                    res = day_pred["result"]
+                    
+                    dir_badge = "▲" if p_dir == "UP" else "▼" if p_dir == "DOWN" else "-"
+                    dir_color = "#FF1744" if p_dir == "UP" else "#2979FF" if p_dir == "DOWN" else "#8A99AD"
+                    
+                    res_badge = "적중" if res == "적중" else "실패" if res == "실패" else "대기"
+                    res_bgcolor = "#00C853" if res == "적중" else "#D32F2F" if res == "실패" else "#E0A800"
+                    
+                    ai_status_row.append(
+                        ft.Container(
+                            content=ft.Row([
+                                ft.Text(m_name[0], size=9, weight=ft.FontWeight.BOLD, color=colors[m_name]),
+                                ft.Text(dir_badge, size=9, color=dir_color, weight=ft.FontWeight.BOLD),
+                                ft.Container(
+                                    content=ft.Text(res_badge, size=8, color="#FFFFFF", weight=ft.FontWeight.BOLD),
+                                    bgcolor=res_bgcolor,
+                                    border_radius=3,
+                                    padding=ft.Padding(left=4, right=4, top=1, bottom=1)
+                                )
+                            ], spacing=2, alignment=ft.MainAxisAlignment.CENTER),
+                            width=80
+                        )
+                    )
+                else:
+                    ai_status_row.append(ft.Container(width=80))
             
             row_ctrl = ft.Container(
                 content=ft.Row([
-                    ft.Text(d_str, size=11, color="#8A99AD" if is_dark else "#64748B"),
-                    ft.Text(f"예측: {dir_text}", size=11, color=dir_color, weight=ft.FontWeight.BOLD),
-                    ft.Text(f"목표: {t_price:,}원", size=11, color=text_color),
-                    ft.Text(act_str, size=11, color="#8A99AD" if is_dark else "#64748B"),
-                    ft.Container(
-                        content=ft.Text(badge_text, size=9, color="#FFFFFF", weight=ft.FontWeight.BOLD),
-                        bgcolor=badge_color,
-                        padding=ft.Padding(left=6, right=6, top=2, bottom=2),
-                        border_radius=4,
-                    )
+                    ft.Text(d_str, size=10, color="#8A99AD" if is_dark else "#64748B", width=70),
+                    ft.Row(ai_status_row, spacing=4, alignment=ft.MainAxisAlignment.CENTER),
                 ], alignment=ft.MainAxisAlignment.SPACE_BETWEEN, vertical_alignment=ft.CrossAxisAlignment.CENTER),
-                padding=8,
+                padding=6,
                 bgcolor="#111827" if is_dark else "#F3F4F6",
                 border_radius=6,
                 border=ft.Border.all(1, "#1F2937" if is_dark else "#E5E7EB")
@@ -879,12 +915,22 @@ class StockPredictorApp:
             lv.controls.append(row_ctrl)
             
         dlg = ft.AlertDialog(
-            title=ft.Text(f"{model_name} 예측 적중률 이력", weight=ft.FontWeight.BOLD),
+            title=ft.Text("AI 종합 예측 적중률 비교", weight=ft.FontWeight.BOLD),
             content=ft.Column([
-                ft.Container(content=stats_text, padding=10, bgcolor="#1F2937" if is_dark else "#F3F4F6", border_radius=6, alignment=ft.alignment.center),
+                ft.Row(stats_cards, alignment=ft.MainAxisAlignment.SPACE_BETWEEN),
                 ft.Divider(color=border_color, height=10),
+                ft.Row([
+                    ft.Text("분석 일자", size=10, weight=ft.FontWeight.BOLD, color="#8A99AD" if is_dark else "#64748B", width=70),
+                    ft.Row([
+                        ft.Container(content=ft.Text("Gemini", size=9, weight=ft.FontWeight.BOLD, color=colors["Gemini"], text_align=ft.TextAlign.CENTER), width=80),
+                        ft.Container(content=ft.Text("ChatGPT", size=9, weight=ft.FontWeight.BOLD, color=colors["ChatGPT"], text_align=ft.TextAlign.CENTER), width=80),
+                        ft.Container(content=ft.Text("Claude", size=9, weight=ft.FontWeight.BOLD, color=colors["Claude"], text_align=ft.TextAlign.CENTER), width=80),
+                        ft.Container(content=ft.Text("Grok", size=9, weight=ft.FontWeight.BOLD, color=colors["Grok"], text_align=ft.TextAlign.CENTER), width=80),
+                    ], spacing=4)
+                ], alignment=ft.MainAxisAlignment.SPACE_BETWEEN),
+                ft.Divider(color=border_color, height=5),
                 lv
-            ], spacing=10, width=480, height=330, tight=True),
+            ], spacing=10, width=500, height=395, tight=True),
             actions=[
                 ft.TextButton("닫기", on_click=lambda _: self.page.pop_dialog())
             ],
