@@ -1106,14 +1106,16 @@ class StockPredictorApp:
         new_top = current_top + delta_y
         
         max_top = 700.0 - 80.0
+        # 1/5만 움직여도 자료의 맨 아래까지 볼 수 있도록 조절 (이동 범위를 1/5인 124px로 제한)
+        allowed_max_top = max_top / 5.0
         if new_top < 0:
             new_top = 0.0
-        elif new_top > max_top:
-            new_top = max_top
+        elif new_top > allowed_max_top:
+            new_top = allowed_max_top
             
         self.scroll_detector.top = new_top
         
-        ratio = new_top / max_top
+        ratio = new_top / allowed_max_top
         
         # Calculate dynamic scroll height to ensure we can scroll precisely to the bottom
         content_height = 960.0
