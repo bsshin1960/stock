@@ -120,9 +120,9 @@ class StockPredictorApp:
             kospi_b64 = self.data_collector.generate_chart_base64("^KS11", "KOSPI 종합주가지수 추이 (3개월)", is_dark)
             
             if kodex_b64:
-                self.kodex_chart.src_base64 = kodex_b64
+                self.kodex_chart.src = f"data:image/png;base64,{kodex_b64}"
             if kospi_b64:
-                self.kospi_chart.src_base64 = kospi_b64
+                self.kospi_chart.src = f"data:image/png;base64,{kospi_b64}"
                 
             self._log("✔ 차트 로딩 완료")
             try:
@@ -321,9 +321,7 @@ class StockPredictorApp:
 
         # ===== 주가 차트 영역 =====
         self.kodex_chart = ft.Image(src="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7", width=611, height=250, fit=ft.BoxFit.CONTAIN)
-        self.kodex_chart.src_base64 = "R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7"
         self.kospi_chart = ft.Image(src="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7", width=611, height=250, fit=ft.BoxFit.CONTAIN)
-        self.kospi_chart.src_base64 = "R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7"
 
         # ===== 주가 차트 박스 구성 =====
         self.chart_kodex_title_icon = ft.Icon(ft.Icons.SHOW_CHART, size=16, color="#7C3AED")
