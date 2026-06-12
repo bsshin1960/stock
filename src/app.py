@@ -320,9 +320,9 @@ class StockPredictorApp:
         self.kodex_box = ft.Container(visible=False, width=0, height=0)
 
         # ===== 주가 차트 영역 =====
-        self.kodex_chart = ft.Image(src="", width=611, height=250, fit=ft.BoxFit.CONTAIN)
+        self.kodex_chart = ft.Image(src="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7", width=611, height=250, fit=ft.BoxFit.CONTAIN)
         self.kodex_chart.src_base64 = "R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7"
-        self.kospi_chart = ft.Image(src="", width=611, height=250, fit=ft.BoxFit.CONTAIN)
+        self.kospi_chart = ft.Image(src="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7", width=611, height=250, fit=ft.BoxFit.CONTAIN)
         self.kospi_chart.src_base64 = "R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7"
 
         # ===== 주가 차트 박스 구성 =====
@@ -547,7 +547,7 @@ class StockPredictorApp:
         # 1. 세로 Stack (마우스 휠 스크롤 원천 차단 및 절대 고정)
         self.vertical_scroll_content = ft.Container(
             content=body,
-            padding=ft.Padding(left=15, right=8, top=0, bottom=10),
+            padding=ft.Padding(left=15, right=8, top=0, bottom=40),
             top=0,
             left=0,
             width=1297,
@@ -1150,7 +1150,7 @@ class StockPredictorApp:
         ratio = new_top / allowed_max_top
         
         # Calculate dynamic scroll height to ensure we can scroll precisely to the bottom
-        content_height = 1300.0
+        content_height = 1330.0
         viewport_height = float(self.vertical_scroll.height) if self.vertical_scroll.height is not None else 900.0
         dynamic_max_scroll = max(0.0, content_height - viewport_height)
         
