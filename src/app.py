@@ -1258,7 +1258,6 @@ class StockPredictorApp:
                 card.data["pct"].color = "#B0C4DE" if is_dark else "#475569"
             card.data["price"].color = text_primary
             card.data["reason"].color = "#FFFFFF" if is_dark else "#0F172A"
-            card.data["link"].color = accent_color
             
         # 매크로 카드 색상 조정
         for key, card in self.macro_cards.items():
