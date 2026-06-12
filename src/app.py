@@ -330,9 +330,9 @@ class StockPredictorApp:
             content=ft.Column([
                 ft.Row([self.chart_kodex_title_icon, self.chart_kodex_title_text], spacing=6),
                 ft.Divider(color="#CBD5E1", thickness=1, height=1),
-                ft.Container(content=self.kodex_chart, expand=True, alignment=ft.Alignment(0, 0))
+                ft.Container(content=self.kodex_chart, expand=True, alignment=ft.Alignment(0, 0), padding=0, margin=0)
             ], spacing=4),
-            bgcolor="#F8FAFC", padding=5, border_radius=12,
+            bgcolor="#F8FAFC", padding=ft.Padding(left=4, right=4, top=6, bottom=4), border_radius=12,
             border=ft.Border.all(1, "#455A64"), width=631, height=327,
             on_hover=self.handle_body_hover
         )
@@ -343,9 +343,9 @@ class StockPredictorApp:
             content=ft.Column([
                 ft.Row([self.chart_kospi_title_icon, self.chart_kospi_title_text], spacing=6),
                 ft.Divider(color="#CBD5E1", thickness=1, height=1),
-                ft.Container(content=self.kospi_chart, expand=True, alignment=ft.Alignment(0, 0))
+                ft.Container(content=self.kospi_chart, expand=True, alignment=ft.Alignment(0, 0), padding=0, margin=0)
             ], spacing=4),
-            bgcolor="#F8FAFC", padding=5, border_radius=12,
+            bgcolor="#F8FAFC", padding=ft.Padding(left=4, right=4, top=6, bottom=4), border_radius=12,
             border=ft.Border.all(1, "#455A64"), width=631, height=327,
             on_hover=self.handle_body_hover
         )

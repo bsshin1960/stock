@@ -357,8 +357,8 @@ class DataCollector:
             plt.tight_layout()
             
             buf = io.BytesIO()
-            # bbox_inches='tight' 및 pad_inches=0.02 옵션으로 상하좌우 여백을 최소화하여 저장
-            plt.savefig(buf, format='png', facecolor=fig.get_facecolor(), edgecolor='none', bbox_inches='tight', pad_inches=0.02)
+            # bbox_inches='tight' 및 pad_inches=0.01 옵션으로 상하좌우 여백을 최소화하여 저장
+            plt.savefig(buf, format='png', facecolor=fig.get_facecolor(), edgecolor='none', bbox_inches='tight', pad_inches=0.01)
             buf.seek(0)
             img_str = base64.b64encode(buf.read()).decode('utf-8')
             plt.close(fig)
