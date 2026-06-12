@@ -474,6 +474,15 @@ class StockPredictorApp:
 
         self.macro_section_icon = ft.Icon(ft.Icons.PUBLIC_ROUNDED, size=16, color="#C084FC")
         self.macro_section_text = ft.Text("주가 변동 인자 분석 (30%)", size=13, color="#C084FC", weight=ft.FontWeight.BOLD)
+        
+        self.history_total_btn = ft.TextButton(
+            "적중률 내역",
+            style=ft.ButtonStyle(
+                color="#00B0FF",
+                text_style=ft.TextStyle(size=12, weight=ft.FontWeight.BOLD)
+            ),
+            on_click=lambda e: self.show_total_ai_history_dialog()
+        )
 
         # ===== 페이지 조립 =====
         body = ft.Column([
@@ -492,9 +501,12 @@ class StockPredictorApp:
             ], spacing=6),
             ft.Row(controls=[self.ai_cards["Gemini"], self.ai_cards["ChatGPT"], self.ai_cards["Claude"], self.ai_cards["Grok"]], spacing=12),
             ft.Row([
-                self.macro_section_icon,
-                self.macro_section_text
-            ], spacing=6),
+                ft.Row([
+                    self.macro_section_icon,
+                    self.macro_section_text
+                ], spacing=6),
+                self.history_total_btn
+            ], alignment=ft.MainAxisAlignment.SPACE_BETWEEN, width=1274),
             ft.Row(controls=mc, spacing=10),
             ft.Row([self.news_box, self.rumor_box], spacing=12),
             ft.Row([self.monitor_box, self.accuracy_box], spacing=12),
@@ -590,25 +602,12 @@ class StockPredictorApp:
         is_dark = self.page.theme_mode == ft.ThemeMode.DARK
         accent_color = "#C084FC" if is_dark else "#7C3AED"
         
-        history_btn = ft.TextButton(
-            "적중률",
-            style=ft.ButtonStyle(
-                color=accent_color,
-                padding=ft.Padding(left=4, right=4, top=0, bottom=0),
-                text_style=ft.TextStyle(size=10, weight=ft.FontWeight.BOLD)
-            ),
-            on_click=lambda e: self.show_total_ai_history_dialog()
-        )
-        
         c = ft.Container(
             content=ft.Column([
                 ft.Row([
-                    ft.Row([
-                        ft.Container(width=10, height=10, bgcolor=color, border_radius=5),
-                        ft.Text(display_name, size=13, weight=ft.FontWeight.BOLD, color="#0F172A")
-                    ], spacing=6),
-                    history_btn
-                ], alignment=ft.MainAxisAlignment.SPACE_BETWEEN, vertical_alignment=ft.CrossAxisAlignment.CENTER),
+                    ft.Container(width=10, height=10, bgcolor=color, border_radius=5),
+                    ft.Text(display_name, size=13, weight=ft.FontWeight.BOLD, color="#0F172A")
+                ], spacing=6, vertical_alignment=ft.CrossAxisAlignment.CENTER),
                 ft.Divider(color="#CBD5E1", thickness=1), lp, lprice,
                 ft.Container(
                     content=ft.Column([lr], scroll=ft.ScrollMode.AUTO, expand=True),
@@ -618,7 +617,7 @@ class StockPredictorApp:
             bgcolor="#FFFFFF", padding=12, border_radius=12, border=ft.Border.all(1, "#78909C"), width=309, height=218,
             on_hover=self.handle_body_hover
         )
-        c.data = {"pct": lp, "price": lprice, "reason": lr, "link": history_btn}
+        c.data = {"pct": lp, "price": lprice, "reason": lr}
         return c
 
     def _mk_macro_card(self, title):
