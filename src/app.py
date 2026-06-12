@@ -231,7 +231,7 @@ class StockPredictorApp:
         # ===== 헤더 =====
         self.title_label = ft.Text("KODEX 200 AI Predictor", size=24, weight=ft.FontWeight.BOLD, color="#000000")
         init_date_color = "#7C3AED"
-        self.subtitle_date_span = ft.TextSpan(f"{datetime.datetime.now().strftime('%Y년 %m월 %d일 %H시 %M분')} 기준", style=ft.TextStyle(color=init_date_color, weight=ft.FontWeight.BOLD))
+        self.subtitle_date_span = ft.TextSpan(f"현재({datetime.datetime.now().strftime('%Y년 %m월 %d일 %H시 %M분')}) 기준", style=ft.TextStyle(color=init_date_color, weight=ft.FontWeight.BOLD))
         self.subtitle_label = ft.Text(
             spans=[
                 self.subtitle_date_span,
@@ -1715,7 +1715,7 @@ class StockPredictorApp:
         
         accent_color = "#C084FC" if is_dark else "#7C3AED"
         self.subtitle_label.spans = [
-            ft.TextSpan(f"{now_str} 기준", style=ft.TextStyle(color=accent_color, weight=ft.FontWeight.BOLD)),
+            ft.TextSpan(f"현재({now_str}) 기준", style=ft.TextStyle(color=accent_color, weight=ft.FontWeight.BOLD)),
             ft.TextSpan(" 국내/미국 선물, 실시간 뉴스/주가, VIX 공포지수 등 변동 요인을 종합 분석하여 다음날 Kodex200 ETF의 시초가 예측",
                         style=ft.TextStyle(color="#8A99AD" if is_dark else "#64748B", weight=ft.FontWeight.BOLD))
         ]
