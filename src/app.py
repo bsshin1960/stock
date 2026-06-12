@@ -332,7 +332,7 @@ class StockPredictorApp:
                 ft.Divider(color="#CBD5E1", thickness=1, height=1),
                 ft.Container(content=self.kodex_chart, expand=True, alignment=ft.Alignment(0, 0))
             ], spacing=4),
-            bgcolor="#F8FAFC", padding=10, border_radius=12,
+            bgcolor="#F8FAFC", padding=5, border_radius=12,
             border=ft.Border.all(1, "#455A64"), width=631, height=327,
             on_hover=self.handle_body_hover
         )
@@ -345,7 +345,7 @@ class StockPredictorApp:
                 ft.Divider(color="#CBD5E1", thickness=1, height=1),
                 ft.Container(content=self.kospi_chart, expand=True, alignment=ft.Alignment(0, 0))
             ], spacing=4),
-            bgcolor="#F8FAFC", padding=10, border_radius=12,
+            bgcolor="#F8FAFC", padding=5, border_radius=12,
             border=ft.Border.all(1, "#455A64"), width=631, height=327,
             on_hover=self.handle_body_hover
         )

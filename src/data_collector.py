@@ -271,6 +271,48 @@ class DataCollector:
             # 이쁘게 차트 채우기 (아래 영역 채우기 - 그라데이션 느낌 효과)
             ax.fill_between(df.index, df['Close'], min(df['Close']) * 0.99, color=line_color, alpha=0.1)
             
+            # 최고가 / 최저가 포인트 찾기 및 표시
+            max_val = df['Close'].max()
+            max_idx = df['Close'].idxmax()
+            min_val = df['Close'].min()
+            min_idx = df['Close'].idxmin()
+            
+            # Y축 범위 넓히기 (최고/최저가 텍스트 배지가 상하로 그려지므로 여유 공간 15% 추가)
+            y_range = max_val - min_val if max_val != min_val else 1.0
+            ax.set_ylim(min_val - y_range * 0.15, max_val + y_range * 0.15)
+            
+            # 최고가 표시 (상단 배지)
+            max_str = f"▲ {max_val:,.2f}" if ticker_symbol.startswith("^") else f"▲ {int(max_val):,}"
+            ax.scatter(max_idx, max_val, color='#FF3D00', s=25, zorder=5)
+            ax.annotate(
+                max_str,
+                xy=(max_idx, max_val),
+                xytext=(0, 6),
+                textcoords="offset points",
+                color='#FF3D00',
+                fontsize=8,
+                weight='bold',
+                va='bottom',
+                ha='center',
+                bbox=dict(boxstyle="round,pad=0.15", fc=bg_color, ec='#FF3D00', lw=0.8, alpha=0.85)
+            )
+            
+            # 최저가 표시 (하단 배지)
+            min_str = f"▼ {min_val:,.2f}" if ticker_symbol.startswith("^") else f"▼ {int(min_val):,}"
+            ax.scatter(min_idx, min_val, color='#2979FF', s=25, zorder=5)
+            ax.annotate(
+                min_str,
+                xy=(min_idx, min_val),
+                xytext=(0, -6),
+                textcoords="offset points",
+                color='#2979FF',
+                fontsize=8,
+                weight='bold',
+                va='top',
+                ha='center',
+                bbox=dict(boxstyle="round,pad=0.15", fc=bg_color, ec='#2979FF', lw=0.8, alpha=0.85)
+            )
+            
             # 마지막 데이터 포인트 표시 (끝단 현재 주가 기록)
             last_date = df.index[-1]
             last_price = df['Close'].iloc[-1]
@@ -315,7 +357,8 @@ class DataCollector:
             plt.tight_layout()
             
             buf = io.BytesIO()
-            plt.savefig(buf, format='png', facecolor=fig.get_facecolor(), edgecolor='none')
+            # bbox_inches='tight' 및 pad_inches=0.02 옵션으로 상하좌우 여백을 최소화하여 저장
+            plt.savefig(buf, format='png', facecolor=fig.get_facecolor(), edgecolor='none', bbox_inches='tight', pad_inches=0.02)
             buf.seek(0)
             img_str = base64.b64encode(buf.read()).decode('utf-8')
             plt.close(fig)
