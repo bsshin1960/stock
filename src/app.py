@@ -320,8 +320,8 @@ class StockPredictorApp:
         self.kodex_box = ft.Container(visible=False, width=0, height=0)
 
         # ===== 주가 차트 영역 =====
-        self.kodex_chart = ft.Image(src="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7", width=611, height=250, fit=ft.BoxFit.CONTAIN)
-        self.kospi_chart = ft.Image(src="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7", width=611, height=250, fit=ft.BoxFit.CONTAIN)
+        self.kodex_chart = ft.Image(src="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7", width=623, height=290, fit=ft.BoxFit.FILL)
+        self.kospi_chart = ft.Image(src="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7", width=623, height=290, fit=ft.BoxFit.FILL)
 
         # ===== 주가 차트 박스 구성 =====
         self.chart_kodex_title_icon = ft.Icon(ft.Icons.SHOW_CHART, size=16, color="#7C3AED")
