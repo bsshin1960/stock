@@ -237,8 +237,8 @@ class DataCollector:
             "news": news_and_rumors["news"],
             "rumors": news_and_rumors["rumors"]
         }
-    def generate_chart_base64(self, ticker_symbol: str, title: str) -> str:
-        """1년치 데이터를 기반으로 다크테마 맞춤 주가 선 차트를 렌더링하여 Base64 인코딩 스트링으로 반환"""
+    def generate_chart_base64(self, ticker_symbol: str, title: str, is_dark: bool = True) -> str:
+        """1년치 데이터를 기반으로 테마 맞춤 주가 선 차트를 렌더링하여 Base64 인코딩 스트링으로 반환"""
         import io
         import base64
         import matplotlib
@@ -255,22 +255,35 @@ class DataCollector:
             if df.empty:
                 return ""
             
-            plt.style.use('dark_background')
+            plt.style.use('dark_background' if is_dark else 'default')
             fig, ax = plt.subplots(figsize=(6, 2.5), dpi=100)
             
-            # 컨테이너 배경에 맞추기 (#1A2333)
-            fig.patch.set_facecolor('#1A2333')
-            ax.set_facecolor('#1A2333')
+            # 테마별 색상 설정
+            bg_color = '#111820' if is_dark else '#F8FAFC'
+            line_color = '#00B0FF' if is_dark else '#7C3AED'  # 다크모드는 밝은 파란색, 라이트모드는 밝은 보라색
+            grid_color = '#1E2A3A' if is_dark else '#E2E8F0'
+            spine_color = '#1E2A3A' if is_dark else '#CBD5E1'
+            text_color = '#B0C4DE' if is_dark else '#475569'
             
-            ax.plot(df.index, df['Close'], color='#00E676', linewidth=1.5)
+            fig.patch.set_facecolor(bg_color)
+            ax.set_facecolor(bg_color)
             
-            ax.set_title(title, fontsize=10, color='#E0E6ED', weight='bold')
+            # 주가 선 그래프 그리기
+            ax.plot(df.index, df['Close'], color=line_color, linewidth=1.8)
+            
+            # 이쁘게 차트 채우기 (아래 영역 채우기 - 그라데이션 느낌 효과)
+            ax.fill_between(df.index, df['Close'], min(df['Close']) * 0.99, color=line_color, alpha=0.1)
+            
+            ax.set_title(title, fontsize=10, color=text_color, weight='bold')
             ax.spines['top'].set_visible(False)
             ax.spines['right'].set_visible(False)
-            ax.spines['left'].set_color('#2E3A4E')
-            ax.spines['bottom'].set_color('#2E3A4E')
-            ax.tick_params(axis='both', colors='#8A99AD', labelsize=8)
-            ax.grid(True, linestyle='--', color='#2E3A4E', alpha=0.3)
+            ax.spines['left'].set_color(spine_color)
+            ax.spines['bottom'].set_color(spine_color)
+            ax.tick_params(axis='both', colors=text_color, labelsize=8)
+            ax.grid(True, linestyle='--', color=grid_color, alpha=0.5)
+            
+            # x축 날짜 포맷 최적화
+            fig.autofmt_xdate(rotation=15)
             
             plt.tight_layout()
             

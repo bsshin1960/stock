@@ -115,8 +115,9 @@ class StockPredictorApp:
     def load_charts(self):
         try:
             self._log("주가 차트(1년) 생성 및 데이터 수집 중...")
-            kodex_b64 = self.data_collector.generate_chart_base64("069500.KS", "KODEX 200 주가 추이 (1년)")
-            kospi_b64 = self.data_collector.generate_chart_base64("^KS11", "KOSPI 종합주가지수 추이 (1년)")
+            is_dark = self.page.theme_mode == ft.ThemeMode.DARK
+            kodex_b64 = self.data_collector.generate_chart_base64("069500.KS", "KODEX 200 주가 추이 (1년)", is_dark)
+            kospi_b64 = self.data_collector.generate_chart_base64("^KS11", "KOSPI 종합주가지수 추이 (1년)", is_dark)
             
             if kodex_b64:
                 self.kodex_chart.src_base64 = kodex_b64
@@ -124,7 +125,10 @@ class StockPredictorApp:
                 self.kospi_chart.src_base64 = kospi_b64
                 
             self._log("✔ 차트 로딩 완료")
-            self.page.update()
+            try:
+                self.page.update()
+            except Exception:
+                pass
         except Exception as e:
             self._log(f"✘ 차트 로드 실패: {e}")
 
@@ -316,10 +320,37 @@ class StockPredictorApp:
         self.kodex_box = ft.Container(visible=False, width=0, height=0)
 
         # ===== 주가 차트 영역 =====
-        self.kodex_chart = ft.Image(src="chart", width=631, height=154, fit=ft.BoxFit.CONTAIN)
+        self.kodex_chart = ft.Image(src="chart", width=611, height=154, fit=ft.BoxFit.CONTAIN)
         self.kodex_chart.src_base64 = "R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7"
-        self.kospi_chart = ft.Image(src="chart", width=631, height=154, fit=ft.BoxFit.CONTAIN)
+        self.kospi_chart = ft.Image(src="chart", width=611, height=154, fit=ft.BoxFit.CONTAIN)
         self.kospi_chart.src_base64 = "R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7"
+
+        # ===== 주가 차트 박스 구성 =====
+        self.chart_kodex_title_icon = ft.Icon(ft.Icons.SHOW_CHART, size=16, color="#7C3AED")
+        self.chart_kodex_title_text = ft.Text("Kodex200 주가", size=13, color="#7C3AED", weight=ft.FontWeight.BOLD)
+        self.kodex_chart_box = ft.Container(
+            content=ft.Column([
+                ft.Row([self.chart_kodex_title_icon, self.chart_kodex_title_text], spacing=6),
+                ft.Divider(color="#CBD5E1", thickness=1, height=1),
+                ft.Container(content=self.kodex_chart, expand=True, alignment=ft.Alignment(0, 0))
+            ], spacing=4),
+            bgcolor="#F8FAFC", padding=10, border_radius=12,
+            border=ft.Border.all(1, "#455A64"), width=631, height=218,
+            on_hover=self.handle_body_hover
+        )
+
+        self.chart_kospi_title_icon = ft.Icon(ft.Icons.INSIGHTS, size=16, color="#7C3AED")
+        self.chart_kospi_title_text = ft.Text("종합 주가 지수", size=13, color="#7C3AED", weight=ft.FontWeight.BOLD)
+        self.kospi_chart_box = ft.Container(
+            content=ft.Column([
+                ft.Row([self.chart_kospi_title_icon, self.chart_kospi_title_text], spacing=6),
+                ft.Divider(color="#CBD5E1", thickness=1, height=1),
+                ft.Container(content=self.kospi_chart, expand=True, alignment=ft.Alignment(0, 0))
+            ], spacing=4),
+            bgcolor="#F8FAFC", padding=10, border_radius=12,
+            border=ft.Border.all(1, "#455A64"), width=631, height=218,
+            on_hover=self.handle_body_hover
+        )
 
         # ===== 실행 컨트롤 =====
         self.progress_ring = ft.ProgressRing(width=22, height=22, stroke_width=3, visible=False, color="#00E676")
@@ -510,6 +541,7 @@ class StockPredictorApp:
             ft.Row(controls=mc, spacing=10),
             ft.Row([self.news_box, self.rumor_box], spacing=12),
             ft.Row([self.monitor_box, self.accuracy_box], spacing=12),
+            ft.Row([self.kodex_chart_box, self.kospi_chart_box], spacing=12),
         ], spacing=6, width=1274)
 
         # 1. 세로 Stack (마우스 휠 스크롤 원천 차단 및 절대 고정)
@@ -1118,7 +1150,7 @@ class StockPredictorApp:
         ratio = new_top / allowed_max_top
         
         # Calculate dynamic scroll height to ensure we can scroll precisely to the bottom
-        content_height = 960.0
+        content_height = 1190.0
         viewport_height = float(self.vertical_scroll.height) if self.vertical_scroll.height is not None else 900.0
         dynamic_max_scroll = max(0.0, content_height - viewport_height)
         
@@ -1138,6 +1170,7 @@ class StockPredictorApp:
         is_dark = self.theme_switch.value
         self.page.theme_mode = ft.ThemeMode.DARK if is_dark else ft.ThemeMode.LIGHT
         self.update_theme_colors(is_dark)
+        self.page.run_thread(self.load_charts)
 
     def update_theme_colors(self, is_dark: bool):
         bg_main = "#121824" if is_dark else "#F4F6F9"
@@ -1302,6 +1335,19 @@ class StockPredictorApp:
         self.monitor_box.border = ft.Border.all(1, border_lower)
         self.accuracy_box.bgcolor = bg_lower
         self.accuracy_box.border = ft.Border.all(1, border_lower)
+        
+        # 차트 박스 테마 업데이트
+        self.kodex_chart_box.bgcolor = bg_lower
+        self.kodex_chart_box.border = ft.Border.all(1, border_lower)
+        self.kodex_chart_box.content.controls[1].color = "#2E3A4E" if is_dark else "#CBD5E1"
+        self.chart_kodex_title_icon.color = accent_color
+        self.chart_kodex_title_text.color = accent_color
+        
+        self.kospi_chart_box.bgcolor = bg_lower
+        self.kospi_chart_box.border = ft.Border.all(1, border_lower)
+        self.kospi_chart_box.content.controls[1].color = "#2E3A4E" if is_dark else "#CBD5E1"
+        self.chart_kospi_title_icon.color = accent_color
+        self.chart_kospi_title_text.color = accent_color
         
         # 우측 가상 스크롤바 색상 업데이트
         self.scroll_handle.bgcolor = "#7E8B9B" if is_dark else "#B0BEC5"
