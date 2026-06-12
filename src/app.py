@@ -476,7 +476,7 @@ class StockPredictorApp:
         self.macro_section_text = ft.Text("주가 변동 인자 분석 (30%)", size=13, color="#C084FC", weight=ft.FontWeight.BOLD)
         
         self.history_total_btn = ft.TextButton(
-            "적중률 내역",
+            "AI 적중률 내역",
             style=ft.ButtonStyle(
                 color="#00B0FF",
                 text_style=ft.TextStyle(size=12, weight=ft.FontWeight.BOLD)
@@ -496,17 +496,17 @@ class StockPredictorApp:
                 self.status_msg,
             ], alignment=ft.MainAxisAlignment.START, width=1274),
             ft.Row([
-                self.ai_section_icon,
-                self.ai_section_text
-            ], spacing=6),
-            ft.Row(controls=[self.ai_cards["Gemini"], self.ai_cards["ChatGPT"], self.ai_cards["Claude"], self.ai_cards["Grok"]], spacing=12),
-            ft.Row([
                 ft.Row([
-                    self.macro_section_icon,
-                    self.macro_section_text
+                    self.ai_section_icon,
+                    self.ai_section_text
                 ], spacing=6),
                 self.history_total_btn
             ], alignment=ft.MainAxisAlignment.SPACE_BETWEEN, width=1274),
+            ft.Row(controls=[self.ai_cards["Gemini"], self.ai_cards["ChatGPT"], self.ai_cards["Claude"], self.ai_cards["Grok"]], spacing=12),
+            ft.Row([
+                self.macro_section_icon,
+                self.macro_section_text
+            ], spacing=6),
             ft.Row(controls=mc, spacing=10),
             ft.Row([self.news_box, self.rumor_box], spacing=12),
             ft.Row([self.monitor_box, self.accuracy_box], spacing=12),
