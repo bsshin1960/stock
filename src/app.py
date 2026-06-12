@@ -921,10 +921,10 @@ class StockPredictorApp:
                 ft.Container(
                     content=ft.Row([
                         ft.Text("분석 일자", size=10, weight=ft.FontWeight.BOLD, color="#8A99AD" if is_dark else "#64748B", width=70),
-                        ft.Container(content=ft.Text("Gemini", size=9, weight=ft.FontWeight.BOLD, color=colors["Gemini"]), alignment=ft.alignment.center, width=80),
-                        ft.Container(content=ft.Text("ChatGPT", size=9, weight=ft.FontWeight.BOLD, color=colors["ChatGPT"]), alignment=ft.alignment.center, width=80),
-                        ft.Container(content=ft.Text("Claude", size=9, weight=ft.FontWeight.BOLD, color=colors["Claude"]), alignment=ft.alignment.center, width=80),
-                        ft.Container(content=ft.Text("Grok", size=9, weight=ft.FontWeight.BOLD, color=colors["Grok"]), alignment=ft.alignment.center, width=80),
+                        ft.Container(content=ft.Text("Gemini", size=9, weight=ft.FontWeight.BOLD, color=colors["Gemini"]), alignment=ft.Alignment(0, 0), width=80),
+                        ft.Container(content=ft.Text("ChatGPT", size=9, weight=ft.FontWeight.BOLD, color=colors["ChatGPT"]), alignment=ft.Alignment(0, 0), width=80),
+                        ft.Container(content=ft.Text("Claude", size=9, weight=ft.FontWeight.BOLD, color=colors["Claude"]), alignment=ft.Alignment(0, 0), width=80),
+                        ft.Container(content=ft.Text("Grok", size=9, weight=ft.FontWeight.BOLD, color=colors["Grok"]), alignment=ft.Alignment(0, 0), width=80),
                     ], spacing=4),
                     padding=ft.Padding(left=12, right=0, top=0, bottom=0)
                 ),
