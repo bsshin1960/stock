@@ -1252,7 +1252,7 @@ class StockPredictorApp:
         for mdl, card in self.ai_cards.items():
             card.bgcolor = bg_card
             card.border = ft.Border.all(1, border_card)
-            card.content.controls[0].controls[0].controls[1].color = text_primary
+            card.content.controls[0].controls[1].color = text_primary
             card.content.controls[1].color = border_card
             if card.data["pct"].color not in ["#FF1744", "#2979FF"]:
                 card.data["pct"].color = "#B0C4DE" if is_dark else "#475569"
