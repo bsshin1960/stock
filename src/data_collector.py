@@ -258,7 +258,7 @@ class DataCollector:
             # 테마별 색상 설정
             bg_color = '#111820' if is_dark else '#F8FAFC'
             line_color = '#00B0FF' if is_dark else '#7C3AED'  # 다크모드는 밝은 파란색, 라이트모드는 밝은 보라색
-            grid_color = '#1E2A3A' if is_dark else '#E2E8F0'
+            grid_color = '#374151' if is_dark else '#94A3B8'  # 더 진한 회색 그리드
             spine_color = '#1E2A3A' if is_dark else '#CBD5E1'
             text_color = '#B0C4DE' if is_dark else '#475569'
             
@@ -271,13 +271,41 @@ class DataCollector:
             # 이쁘게 차트 채우기 (아래 영역 채우기 - 그라데이션 느낌 효과)
             ax.fill_between(df.index, df['Close'], min(df['Close']) * 0.99, color=line_color, alpha=0.1)
             
+            # 마지막 데이터 포인트 표시 (끝단 현재 주가 기록)
+            last_date = df.index[-1]
+            last_price = df['Close'].iloc[-1]
+            
+            # 끝단 포인트 점 찍기
+            ax.scatter(last_date, last_price, color=line_color, s=25, zorder=5)
+            
+            # 끝단 텍스트 포맷 (지수 및 일반 주가 모두 숫자만 포맷팅하여 글꼴 호환성 유지)
+            price_str = f"{last_price:,.2f}" if ticker_symbol.startswith("^") else f"{int(last_price):,}"
+            
+            # x축 범위를 우측으로 10% 넓혀서 우측 주가 텍스트 배지가 잘리지 않게 함
+            xlim = ax.get_xlim()
+            ax.set_xlim(xlim[0], xlim[1] + (xlim[1] - xlim[0]) * 0.10)
+            
+            # 끝단 주가 텍스트 주석 배지 추가
+            ax.annotate(
+                price_str,
+                xy=(last_date, last_price),
+                xytext=(5, 0),
+                textcoords="offset points",
+                color=line_color,
+                fontsize=8,
+                weight='bold',
+                va='center',
+                ha='left',
+                bbox=dict(boxstyle="round,pad=0.2", fc=bg_color, ec=line_color, lw=0.8, alpha=0.85)
+            )
+            
             # 축 및 격자 스타일링 (한글 제목은 컨테이너 타이틀로 대체하므로 제거)
             ax.spines['top'].set_visible(False)
             ax.spines['right'].set_visible(False)
             ax.spines['left'].set_color(spine_color)
             ax.spines['bottom'].set_color(spine_color)
             ax.tick_params(axis='both', colors=text_color, labelsize=8)
-            ax.grid(True, linestyle='--', color=grid_color, alpha=0.5)
+            ax.grid(True, linestyle='--', color=grid_color, alpha=0.7)
             
             # x축 날짜 포맷 최적화 (3개월용: 월-일 표시)
             ax.xaxis.set_major_formatter(mdates.DateFormatter('%m-%d'))
