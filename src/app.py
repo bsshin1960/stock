@@ -114,10 +114,10 @@ class StockPredictorApp:
 
     def load_charts(self):
         try:
-            self._log("주가 차트(1년) 생성 및 데이터 수집 중...")
+            self._log("주가 차트(3개월) 생성 및 데이터 수집 중...")
             is_dark = self.page.theme_mode == ft.ThemeMode.DARK
-            kodex_b64 = self.data_collector.generate_chart_base64("069500.KS", "KODEX 200 주가 추이 (1년)", is_dark)
-            kospi_b64 = self.data_collector.generate_chart_base64("^KS11", "KOSPI 종합주가지수 추이 (1년)", is_dark)
+            kodex_b64 = self.data_collector.generate_chart_base64("069500.KS", "KODEX 200 주가 추이 (3개월)", is_dark)
+            kospi_b64 = self.data_collector.generate_chart_base64("^KS11", "KOSPI 종합주가지수 추이 (3개월)", is_dark)
             
             if kodex_b64:
                 self.kodex_chart.src_base64 = kodex_b64
@@ -320,9 +320,9 @@ class StockPredictorApp:
         self.kodex_box = ft.Container(visible=False, width=0, height=0)
 
         # ===== 주가 차트 영역 =====
-        self.kodex_chart = ft.Image(src="chart", width=611, height=154, fit=ft.BoxFit.CONTAIN)
+        self.kodex_chart = ft.Image(src="", width=611, height=250, fit=ft.BoxFit.CONTAIN)
         self.kodex_chart.src_base64 = "R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7"
-        self.kospi_chart = ft.Image(src="chart", width=611, height=154, fit=ft.BoxFit.CONTAIN)
+        self.kospi_chart = ft.Image(src="", width=611, height=250, fit=ft.BoxFit.CONTAIN)
         self.kospi_chart.src_base64 = "R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7"
 
         # ===== 주가 차트 박스 구성 =====
@@ -335,7 +335,7 @@ class StockPredictorApp:
                 ft.Container(content=self.kodex_chart, expand=True, alignment=ft.Alignment(0, 0))
             ], spacing=4),
             bgcolor="#F8FAFC", padding=10, border_radius=12,
-            border=ft.Border.all(1, "#455A64"), width=631, height=218,
+            border=ft.Border.all(1, "#455A64"), width=631, height=327,
             on_hover=self.handle_body_hover
         )
 
@@ -348,7 +348,7 @@ class StockPredictorApp:
                 ft.Container(content=self.kospi_chart, expand=True, alignment=ft.Alignment(0, 0))
             ], spacing=4),
             bgcolor="#F8FAFC", padding=10, border_radius=12,
-            border=ft.Border.all(1, "#455A64"), width=631, height=218,
+            border=ft.Border.all(1, "#455A64"), width=631, height=327,
             on_hover=self.handle_body_hover
         )
 
@@ -1150,7 +1150,7 @@ class StockPredictorApp:
         ratio = new_top / allowed_max_top
         
         # Calculate dynamic scroll height to ensure we can scroll precisely to the bottom
-        content_height = 1190.0
+        content_height = 1300.0
         viewport_height = float(self.vertical_scroll.height) if self.vertical_scroll.height is not None else 900.0
         dynamic_max_scroll = max(0.0, content_height - viewport_height)
         

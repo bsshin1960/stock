@@ -238,25 +238,22 @@ class DataCollector:
             "rumors": news_and_rumors["rumors"]
         }
     def generate_chart_base64(self, ticker_symbol: str, title: str, is_dark: bool = True) -> str:
-        """1년치 데이터를 기반으로 테마 맞춤 주가 선 차트를 렌더링하여 Base64 인코딩 스트링으로 반환"""
+        """최근 3개월치 데이터를 기반으로 테마 맞춤 주가 선 차트를 렌더링하여 Base64 인코딩 스트링으로 반환"""
         import io
         import base64
         import matplotlib
         matplotlib.use('Agg')
         import matplotlib.pyplot as plt
+        import matplotlib.dates as mdates
         
         try:
-            # 한글 폰트 및 마이너스 기호 깨짐 방지 설정
-            matplotlib.rcParams['font.family'] = 'Malgun Gothic'
-            matplotlib.rcParams['axes.unicode_minus'] = False
-            
             ticker = yf.Ticker(ticker_symbol)
-            df = ticker.history(period="1y", timeout=5)
+            df = ticker.history(period="3mo", timeout=5)
             if df.empty:
                 return ""
             
             plt.style.use('dark_background' if is_dark else 'default')
-            fig, ax = plt.subplots(figsize=(6, 2.5), dpi=100)
+            fig, ax = plt.subplots(figsize=(6.1, 3.2), dpi=100)
             
             # 테마별 색상 설정
             bg_color = '#111820' if is_dark else '#F8FAFC'
@@ -274,7 +271,7 @@ class DataCollector:
             # 이쁘게 차트 채우기 (아래 영역 채우기 - 그라데이션 느낌 효과)
             ax.fill_between(df.index, df['Close'], min(df['Close']) * 0.99, color=line_color, alpha=0.1)
             
-            ax.set_title(title, fontsize=10, color=text_color, weight='bold')
+            # 축 및 격자 스타일링 (한글 제목은 컨테이너 타이틀로 대체하므로 제거)
             ax.spines['top'].set_visible(False)
             ax.spines['right'].set_visible(False)
             ax.spines['left'].set_color(spine_color)
@@ -282,7 +279,9 @@ class DataCollector:
             ax.tick_params(axis='both', colors=text_color, labelsize=8)
             ax.grid(True, linestyle='--', color=grid_color, alpha=0.5)
             
-            # x축 날짜 포맷 최적화
+            # x축 날짜 포맷 최적화 (3개월용: 월-일 표시)
+            ax.xaxis.set_major_formatter(mdates.DateFormatter('%m-%d'))
+            ax.xaxis.set_major_locator(mdates.DayLocator(interval=15))
             fig.autofmt_xdate(rotation=15)
             
             plt.tight_layout()
