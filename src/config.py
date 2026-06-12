@@ -1,4 +1,5 @@
 import os
+import sys
 from pathlib import Path
 from dotenv import load_dotenv
 
@@ -6,7 +7,13 @@ from dotenv import load_dotenv
 load_dotenv()
 
 # 경로 설정
-BASE_DIR = Path(__file__).resolve().parent.parent
+if getattr(sys, 'frozen', False):
+    # PyInstaller로 패키징된 실행 파일 경로
+    BASE_DIR = Path(sys.executable).resolve().parent
+else:
+    # 일반 파이썬 실행
+    BASE_DIR = Path(__file__).resolve().parent.parent
+
 REPORTS_DIR = BASE_DIR / "reports"
 REPORTS_DIR.mkdir(exist_ok=True)
 

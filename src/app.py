@@ -235,9 +235,10 @@ class StockPredictorApp:
         self.subtitle_label = ft.Text(
             spans=[
                 self.subtitle_date_span,
-                ft.TextSpan(" 한일 선물, 대형주, VIX 공포지수 및 실시간 뉴스/주가 변동 요인을 종합 분석하여 가중치가 반영된 최종 등락을 예측합니다.")
+                ft.TextSpan(" 국내/미국 선물, 실시간 뉴스/주가, VIX 공포지수 등 변동 요인을 종합 분석하여 다음날 Kodex200 ETF의 시초가 예측",
+                            style=ft.TextStyle(weight=ft.FontWeight.BOLD))
             ],
-            size=11,
+            size=14,
             color="#64748B"
         )
 
@@ -272,40 +273,47 @@ class StockPredictorApp:
             on_hover=self.handle_body_hover,
         )
 
-        # ===== 국내 기초자산 =====
-        self.kodex_price = ft.Text("KODEX200: - 원", size=15, weight=ft.FontWeight.BOLD, color="#FFFFFF")
-        self.kodex_change = ft.Text("등락률: -%", size=12, color="#FFFFFF")
-        self.samsung_price = ft.Text("삼성전자: - 원", size=13, color="#E0E6ED")
-        self.samsung_change = ft.Text("(-%)", size=11, color="#8A99AD")
-        self.hynix_price = ft.Text("SK하이닉스: - 원", size=13, color="#E0E6ED")
-        self.hynix_change = ft.Text("(-%)", size=11, color="#8A99AD")
+        # ===== 시총 TOP10 주가 박스 =====
+        self.top10_lv = ft.ListView(expand=True, spacing=2, padding=ft.Padding(left=4, right=4, top=2, bottom=2))
+        self.top10_title_icon = ft.Icon(ft.Icons.LEADERBOARD_ROUNDED, size=16, color="#7C3AED")
+        self.top10_title_text = ft.Text("시총 TOP10 회사 주가", size=13, color="#7C3AED", weight=ft.FontWeight.BOLD)
 
-        self.kodex_title_icon = ft.Icon(ft.Icons.FLAG_CIRCLE_ROUNDED, size=16, color="#C084FC")
-        self.kodex_title_text = ft.Text("주가 변동 요인", size=13, color="#C084FC", weight=ft.FontWeight.BOLD)
-
-        self.kodex_box = ft.Container(
+        self.top10_box = ft.Container(
             content=ft.Column([
-                ft.Row([self.kodex_title_icon, self.kodex_title_text], spacing=6),
-                ft.Divider(color="#2E3A4E", thickness=1, height=1),
-                ft.Row([self.kodex_price, self.kodex_change], spacing=8),
-                ft.Row([
-                    ft.Column([self.samsung_price, self.samsung_change], spacing=1),
-                    ft.VerticalDivider(width=8, color="#2E3A4E"),
-                    ft.Column([self.hynix_price, self.hynix_change], spacing=1),
-                ], alignment=ft.MainAxisAlignment.SPACE_BETWEEN),
+                ft.Row([self.top10_title_icon, self.top10_title_text], spacing=6),
+                ft.Divider(color="#CBD5E1", thickness=1, height=1),
+                ft.Container(content=self.top10_lv, expand=True, bgcolor="#00000000"),
             ], spacing=4),
             bgcolor="#FFFFFF", padding=ft.Padding(left=12, right=12, top=10, bottom=10), border_radius=12,
-            border=ft.Border.all(1, "#78909C"), width=631, height=110,
+            border=ft.Border.all(1, "#78909C"), width=309, height=110,
             on_hover=self.handle_body_hover,
         )
 
-        # ===== 국내 기임 텍스트 컴색 수정 =====
-        self.kodex_price.color = "#0F172A"
-        self.kodex_change.color = "#0F172A"
-        self.samsung_price.color = "#1E293B"
-        self.samsung_change.color = "#64748B"
-        self.hynix_price.color = "#1E293B"
-        self.hynix_change.color = "#64748B"
+        # ===== 개발중 플레이스홀더 박스 =====
+        self.dev_box = ft.Container(
+            content=ft.Column([
+                ft.Row([
+                    ft.Icon(ft.Icons.CONSTRUCTION_ROUNDED, size=16, color="#7C3AED"),
+                    ft.Text("개발중...", size=13, color="#7C3AED", weight=ft.FontWeight.BOLD)
+                ], spacing=6),
+                ft.Divider(color="#CBD5E1", thickness=1, height=1),
+                ft.Text("향후 추가 정보를 표시할 예정입니다.", size=12, color="#94A3B8", italic=True),
+            ], spacing=6),
+            bgcolor="#FFFFFF", padding=ft.Padding(left=12, right=12, top=10, bottom=10), border_radius=12,
+            border=ft.Border.all(1, "#78909C"), width=309, height=110,
+            on_hover=self.handle_body_hover,
+        )
+
+        # 분석 로직 호환성 유지용 히든 위젯
+        self.kodex_price = ft.Text("", visible=False)
+        self.kodex_change = ft.Text("", visible=False)
+        self.kodex_title_icon = ft.Icon(ft.Icons.FLAG_CIRCLE_ROUNDED, size=1, visible=False)
+        self.kodex_title_text = ft.Text("", visible=False)
+        self.samsung_price = ft.Text("", visible=False)
+        self.samsung_change = ft.Text("", visible=False)
+        self.hynix_price = ft.Text("", visible=False)
+        self.hynix_change = ft.Text("", visible=False)
+        self.kodex_box = ft.Container(visible=False, width=0, height=0)
 
         # ===== 주가 차트 영역 =====
         self.kodex_chart = ft.Image(src="chart", width=631, height=154, fit=ft.BoxFit.CONTAIN)
@@ -474,7 +482,7 @@ class StockPredictorApp:
                 theme_and_run_col
             ], alignment=ft.MainAxisAlignment.SPACE_BETWEEN, width=1274),
             ft.Divider(color="#2E3A4E", thickness=1, height=1),
-            ft.Row([self.consensus_box, self.kodex_box], spacing=12),
+            ft.Row([self.consensus_box, self.top10_box, self.dev_box], spacing=12),
             ft.Row([
                 self.status_msg,
             ], alignment=ft.MainAxisAlignment.START, width=1274),
@@ -570,39 +578,86 @@ class StockPredictorApp:
         except Exception:
             pass
         self._log(f"✔ UI 레이아웃 로드 완료 - 메인 폭: 1274px, 창 너비: {self.page.window.width}px")
+        # 앱 시작 시 TOP10 주가 비동기 조회
+        self.page.run_thread(self._fetch_top10)
 
     # ─── 카드 헬퍼 ───
     def _mk_ai_card(self, name, color):
-        lp = ft.Text("- %", size=18, weight=ft.FontWeight.BOLD, color="#B0C4DE")
-        lprice = ft.Text("- 원", size=14, color="#E0E6ED")
-        lr = ft.Text("대기 중...", size=11, color="#FFFFFF", no_wrap=False, text_align=ft.TextAlign.JUSTIFY)
+        lp = ft.Text("- %", size=18, weight=ft.FontWeight.BOLD, color="#475569")
+        lprice = ft.Text("- 원", size=14, color="#334155")
+        lr = ft.Text("대기 중...", size=11, color="#475569", no_wrap=False, text_align=ft.TextAlign.JUSTIFY)
         c = ft.Container(
             content=ft.Column([
-                ft.Row([ft.Container(width=10, height=10, bgcolor=color, border_radius=5), ft.Text(name, size=13, weight=ft.FontWeight.BOLD, color="#E0E6ED")], spacing=8),
-                ft.Divider(color="#2E3A4E", thickness=1), lp, lprice,
+                ft.Row([ft.Container(width=10, height=10, bgcolor=color, border_radius=5), ft.Text(name, size=13, weight=ft.FontWeight.BOLD, color="#0F172A")], spacing=8),
+                ft.Divider(color="#CBD5E1", thickness=1), lp, lprice,
                 ft.Container(
                     content=ft.Column([lr], scroll=ft.ScrollMode.AUTO, expand=True),
                     expand=True
                 ),
             ], spacing=4),
-            bgcolor="#1A2333", padding=12, border_radius=12, border=ft.Border.all(1, "#2E3A4E"), width=309, height=218,
+            bgcolor="#FFFFFF", padding=12, border_radius=12, border=ft.Border.all(1, "#78909C"), width=309, height=218,
             on_hover=self.handle_body_hover
         )
         c.data = {"pct": lp, "price": lprice, "reason": lr}
         return c
 
     def _mk_macro_card(self, title):
-        lv = ft.Text("-", size=14, weight=ft.FontWeight.BOLD, color="#E0E6ED")
-        lp = ft.Text("-", size=11, color="#8A99AD")
+        lv = ft.Text("-", size=14, weight=ft.FontWeight.BOLD, color="#0F172A")
+        lp = ft.Text("-", size=11, color="#64748B")
         c = ft.Container(
-            content=ft.Column([ft.Text(title, size=11, color="#8A99AD"), lv, lp], spacing=2, alignment=ft.MainAxisAlignment.CENTER),
-            bgcolor="#1A2333", padding=8, border_radius=10, border=ft.Border.all(1, "#2E3A4E"), width=132, height=82,
+            content=ft.Column([ft.Text(title, size=11, color="#64748B"), lv, lp], spacing=2, alignment=ft.MainAxisAlignment.CENTER),
+            bgcolor="#FFFFFF", padding=8, border_radius=10, border=ft.Border.all(1, "#78909C"), width=132, height=82,
             on_hover=self.handle_body_hover
         )
         c.data = {"val": lv, "pct": lp}
         return c
 
 
+    # ─── 시총 TOP10 주가 조회 ───
+    def _fetch_top10(self):
+        """yfinance로 KOSPI 시총 TOP10 회사 주가를 조회하여 top10_lv에 표시"""
+        TOP10 = [
+            ("삼성전자",     "005930.KS"),
+            ("SK하이닉스",   "000660.KS"),
+            ("LG에너지솔루션", "373220.KS"),
+            ("삼성바이오로직스", "207940.KS"),
+            ("현대차",       "005380.KS"),
+            ("기아",         "000270.KS"),
+            ("삼성SDI",     "006400.KS"),
+            ("KB금융",      "105560.KS"),
+            ("POSCO홀딩스",  "005490.KS"),
+            ("신한지주",     "055550.KS"),
+        ]
+        try:
+            import yfinance as yf
+            self.top10_lv.controls.clear()
+            is_dark = self.page.theme_mode == ft.ThemeMode.DARK
+            text_col = "#E0E6ED" if is_dark else "#0F172A"
+            for name, ticker in TOP10:
+                try:
+                    t = yf.Ticker(ticker)
+                    hist = t.fast_info
+                    pct = ((hist.last_price - hist.previous_close) / hist.previous_close * 100) if hist.previous_close else 0
+                    pct_str = f"{pct:+.2f}%"
+                    pct_color = "#FF1744" if pct > 0 else "#2979FF" if pct < 0 else "#8A99AD"
+                    price_val = hist.last_price
+                    price_str = f"{int(price_val):,}원" if price_val else "-원"
+                except Exception:
+                    pct_str = "-%"
+                    pct_color = "#8A99AD"
+                    price_str = "-원"
+                row = ft.Row([
+                    ft.Text(name, size=11, color=text_col, expand=True),
+                    ft.Text(price_str, size=11, color=text_col),
+                    ft.Text(pct_str, size=11, weight=ft.FontWeight.BOLD, color=pct_color),
+                ], alignment=ft.MainAxisAlignment.SPACE_BETWEEN)
+                self.top10_lv.controls.append(row)
+            try:
+                self.page.update()
+            except Exception:
+                pass
+        except Exception as ex:
+            self._log(f"TOP10 주가 조회 실패: {ex}")
 
     def _clear_log(self):
         self.monitor_lv.controls.clear()
@@ -950,13 +1005,13 @@ class StockPredictorApp:
                 if i == 0:
                     span.style = ft.TextStyle(color=accent_color, weight=ft.FontWeight.BOLD)
                 else:
-                    span.style = ft.TextStyle(color="#8A99AD" if is_dark else "#64748B")
+                    span.style = ft.TextStyle(color="#8A99AD" if is_dark else "#64748B", weight=ft.FontWeight.BOLD)
                     
         # 박스 제목 및 아이콘 악센트 색상 변경
         self.consensus_title_icon.color = accent_color
         self.consensus_title_text.color = accent_color
-        self.kodex_title_icon.color = accent_color
-        self.kodex_title_text.color = accent_color
+        self.top10_title_icon.color = accent_color
+        self.top10_title_text.color = accent_color
         self.news_title_icon.color = accent_color
         self.news_title_text.color = accent_color
         self.rumor_title_icon.color = accent_color
@@ -977,12 +1032,15 @@ class StockPredictorApp:
             self.consensus_box.border = ft.Border.all(2, "#40C4FF")
         self.result_price.color = "#B0C4DE" if is_dark else "#475569"
             
-        # 국내 기초자산 박스 (주가 변동 요인)
-        self.kodex_box.bgcolor = bg_card
-        self.kodex_box.border = ft.Border.all(1, border_card)
-        self.kodex_price.color = "#FFFFFF" if is_dark else "#0F172A"
-        self.samsung_price.color = text_primary
-        self.hynix_price.color = text_primary
+        # TOP10 박스 및 개발중 박스 테마 업데이트
+        self.top10_box.bgcolor = bg_card
+        self.top10_box.border = ft.Border.all(1, border_card)
+        self.dev_box.bgcolor = bg_card
+        self.dev_box.border = ft.Border.all(1, border_card)
+        for row_ctrl in self.top10_lv.controls:
+            if isinstance(row_ctrl, ft.Row) and len(row_ctrl.controls) == 3:
+                row_ctrl.controls[0].color = text_primary
+                row_ctrl.controls[1].color = text_primary
         
         # AI 카드 색상 조정
         for mdl, card in self.ai_cards.items():
@@ -1409,7 +1467,8 @@ class StockPredictorApp:
         accent_color = "#C084FC" if is_dark else "#7C3AED"
         self.subtitle_label.spans = [
             ft.TextSpan(f"{now_str} 기준", style=ft.TextStyle(color=accent_color, weight=ft.FontWeight.BOLD)),
-            ft.TextSpan(" 한일 선물, 대형주, VIX 공포지수 및 실시간 뉴스/주가 변동 요인을 종합 분석하여 가중치가 반영된 최종 등락을 예측합니다.")
+            ft.TextSpan(" 국내/미국 선물, 실시간 뉴스/주가, VIX 공포지수 등 변동 요인을 종합 분석하여 다음날 Kodex200 ETF의 시초가 예측",
+                        style=ft.TextStyle(color="#8A99AD" if is_dark else "#64748B", weight=ft.FontWeight.BOLD))
         ]
         self.page.update()
 
