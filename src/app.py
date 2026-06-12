@@ -595,9 +595,9 @@ class StockPredictorApp:
             size=10,
             color=accent_color,
             decoration=ft.TextDecoration.UNDERLINE,
-            cursor=ft.MouseCursor.POINTER,
             on_click=lambda e, m=model_name: self.show_ai_history_dialog(m)
         )
+        history_link.mouse_cursor = ft.MouseCursor.CLICK
         
         c = ft.Container(
             content=ft.Column([
