@@ -4,10 +4,12 @@ import json
 import threading
 import datetime
 import flet as ft
+import yfinance as yf
+import pandas as pd
 from src.data_collector import DataCollector
 from src.ai_consensus import AIConsensusManager
 from src.reporter import PredictionReporter
-from src.config import DEFAULT_WEIGHTS, ENV_API_KEYS, REPORTS_DIR, BASE_DIR
+from src.config import DEFAULT_WEIGHTS, ENV_API_KEYS, REPORTS_DIR, BASE_DIR, TICKER_KODEX200
 
 # --- 로컬 JSON 파일 기반 API Key 저장소 ---
 _SETTINGS_FILE = BASE_DIR / "settings.json"
@@ -29,17 +31,55 @@ def _save_settings(data: dict):
         print(f"[Warning] 설정 저장 실패: {e}")
 
 
+class CustomSwitch(ft.Container):
+    def __init__(self, value=True, on_change=None):
+        self.value = value
+        self.on_change = on_change
+        
+        self.thumb = ft.Container(
+            width=16,
+            height=16,
+            bgcolor="#FFFFFF",
+            border_radius=8
+        )
+        
+        super().__init__(
+            content=self.thumb,
+            width=46,  # 10% wider slot
+            height=22,
+            border_radius=11,
+            padding=ft.Padding(left=2, top=2, right=2, bottom=2),
+            alignment=ft.Alignment(1, 0) if value else ft.Alignment(-1, 0),
+            animate_align=ft.Animation(200, ft.AnimationCurve.EASE_OUT),
+            bgcolor="#2196F3" if value else "#475569",
+            border=ft.Border.all(1, "#78909C"),
+            on_click=self._on_click
+        )
+
+    def _on_click(self, e):
+        self.value = not self.value
+        self.alignment = ft.Alignment(1, 0) if self.value else ft.Alignment(-1, 0)
+        if self.on_change:
+            self.on_change(e)
+
+
 class StockPredictorApp:
     def __init__(self, page: ft.Page):
         self.page = page
         self.page.title = "KODEX 200 AI Stock Predictor"
-        self.page.theme_mode = ft.ThemeMode.DARK
-        self.page.bgcolor = "#121824"
+        self.page.theme_mode = ft.ThemeMode.LIGHT
+        self.page.bgcolor = "#F4F6F9"
         self.page.padding = 0
-        self.page.window.width = 1220
-        self.page.window.height = 950
+        self.page.window.width = 1340
+        self.page.window.height = 980
+        self.page.window.min_width = 1340
+        self.page.window.min_height = 980
         self.page.window.resizable = True
-        self.page.scroll = ft.ScrollMode.AUTO
+        self.page.scroll = None
+        self.is_box_hovered = False
+        self.last_scroll_offset = 0.0
+        self.max_scroll_height = 60.0
+        self.is_programmatic_scroll = False
 
 
         self.data_collector = DataCollector()
@@ -57,9 +97,14 @@ class StockPredictorApp:
         self.ai_results = None
         self.consensus_result = None
         self._is_running = False
+        self.is_menu_open = False
+
         self.setup_ui()
+        self.page.run_task(self.page.window.center)
         # 초기 주가 차트 비동기 로딩
-        threading.Thread(target=self.load_charts, daemon=True).start()
+        self.page.run_thread(self.load_charts)
+        # 초기 예측 적중률 이력 로딩
+        self.page.run_thread(self.load_history_ui)
 
     def show_snack_bar(self, message: str, color: str = "#00C853"):
         sb = ft.SnackBar(content=ft.Text(message), bgcolor=color)
@@ -86,8 +131,14 @@ class StockPredictorApp:
     # ─── 모니터링 로그 ───
     def _log(self, msg: str):
         ts = datetime.datetime.now().strftime("%H:%M:%S")
+        is_dark = self.page.theme_mode == ft.ThemeMode.DARK
+        text_color = "#B0C4DE" if is_dark else "#000000"
         self.monitor_lv.controls.append(
-            ft.Text(f"[{ts}] {msg}", size=12, color="#B0C4DE", selectable=True)
+            ft.Container(
+                content=ft.Text(f"[{ts}] {msg}", size=12, color=text_color, selectable=True),
+                on_hover=self.handle_box_hover,
+                bgcolor="#00000000"
+            )
         )
         try:
             self.page.update()
@@ -97,43 +148,97 @@ class StockPredictorApp:
     # ─── UI 빌드 ───
     def setup_ui(self):
         # ===== 메뉴바 =====
-        menubar = ft.MenuBar(
-            style=ft.MenuStyle(bgcolor="#1A2333"),
+        self.menu_file_text = ft.Text("파일", size=13, color="#1E293B")
+        self.menu_setting_text = ft.Text("설정", size=13, color="#1E293B")
+        self.menu_help_text = ft.Text("도움말", size=13, color="#1E293B")
+
+        menu_border = "#B0BEC5"
+        menu_bg = "#FFFFFF"
+        item_style = ft.ButtonStyle(
+            shape=ft.RoundedRectangleBorder(radius=4),
+            padding=ft.Padding(left=8, right=8, top=0, bottom=0),
+            side=ft.BorderSide(0, "transparent"),
+            bgcolor={
+                "hovered": "#F1F5F9",
+                "": "transparent"
+            }
+        )
+
+        self.menubar = ft.MenuBar(
+            style=ft.MenuStyle(
+                bgcolor="#F4F6F9",
+                elevation=0,
+                shadow_color="transparent",
+                shape=ft.RoundedRectangleBorder(radius=0),
+                side=ft.BorderSide(0, "transparent")
+            ),
             controls=[
                 ft.SubmenuButton(
-                    content=ft.Text("파일", size=13, color="#E0E6ED"),
+                    content=self.menu_file_text,
+                    on_open=self.handle_menu_open,
+                    on_close=self.handle_menu_close,
+                    menu_style=ft.MenuStyle(
+                        bgcolor=menu_bg,
+                        side=ft.BorderSide(1, menu_border),
+                        shape=ft.RoundedRectangleBorder(radius=8),
+                        padding=ft.Padding(left=4, top=2, right=4, bottom=2),
+                        shadow_color="black",
+                        elevation=8
+                    ),
                     controls=[
-                        ft.MenuItemButton(content=ft.Text("분석 실행"), leading=ft.Icon(ft.Icons.PLAY_ARROW_ROUNDED, size=18), on_click=self.run_analysis),
-                        ft.MenuItemButton(content=ft.Text("보고서 저장"), leading=ft.Icon(ft.Icons.SAVE_ROUNDED, size=18), on_click=self.save_report_file),
-                        ft.MenuItemButton(content=ft.Text("보고서 열기 (폴더)"), leading=ft.Icon(ft.Icons.FOLDER_OPEN_ROUNDED, size=18), on_click=self.open_reports_folder),
-                        ft.MenuItemButton(content=ft.Text("종료"), leading=ft.Icon(ft.Icons.EXIT_TO_APP, size=18), on_click=lambda _: self.page.window.close()),
+                        ft.MenuItemButton(content=ft.Text("실행", size=12), leading=ft.Icon(ft.Icons.PLAY_ARROW_ROUNDED, size=16), on_click=self.run_analysis, style=item_style, height=25),
+                        ft.MenuItemButton(content=ft.Text("열기", size=12), leading=ft.Icon(ft.Icons.FILE_OPEN_ROUNDED, size=16), on_click=self.load_report_file, style=item_style, height=25),
+                        ft.MenuItemButton(content=ft.Text("저장", size=12), leading=ft.Icon(ft.Icons.SAVE_ROUNDED, size=16), on_click=self.save_report_file, style=item_style, height=25),
+                        ft.MenuItemButton(content=ft.Text("종료", size=12), leading=ft.Icon(ft.Icons.EXIT_TO_APP, size=16), on_click=lambda _: self.page.window.close(), style=item_style, height=25),
                     ],
                 ),
                 ft.SubmenuButton(
-                    content=ft.Text("설정", size=13, color="#E0E6ED"),
+                    content=self.menu_setting_text,
+                    on_open=self.handle_menu_open,
+                    on_close=self.handle_menu_close,
+                    menu_style=ft.MenuStyle(
+                        bgcolor=menu_bg,
+                        side=ft.BorderSide(1, menu_border),
+                        shape=ft.RoundedRectangleBorder(radius=8),
+                        padding=ft.Padding(left=4, top=2, right=4, bottom=2),
+                        shadow_color="black",
+                        elevation=8
+                    ),
                     controls=[
-                        ft.MenuItemButton(content=ft.Text("API Key 설정"), leading=ft.Icon(ft.Icons.KEY_ROUNDED, size=18), on_click=self.open_settings_dialog),
+                        ft.MenuItemButton(content=ft.Text("API Key 설정", size=12), leading=ft.Icon(ft.Icons.KEY_ROUNDED, size=16), on_click=self.open_settings_dialog, style=item_style, height=25),
                     ],
                 ),
                 ft.SubmenuButton(
-                    content=ft.Text("도움말", size=13, color="#E0E6ED"),
+                    content=self.menu_help_text,
+                    on_open=self.handle_menu_open,
+                    on_close=self.handle_menu_close,
+                    menu_style=ft.MenuStyle(
+                        bgcolor=menu_bg,
+                        side=ft.BorderSide(1, menu_border),
+                        shape=ft.RoundedRectangleBorder(radius=8),
+                        padding=ft.Padding(left=4, top=2, right=4, bottom=2),
+                        shadow_color="black",
+                        elevation=8
+                    ),
                     controls=[
-                        ft.MenuItemButton(content=ft.Text("사용 가이드"), leading=ft.Icon(ft.Icons.HELP_OUTLINE_ROUNDED, size=18), on_click=self.open_help_dialog),
-                        ft.MenuItemButton(content=ft.Text("프로그램 정보"), leading=ft.Icon(ft.Icons.INFO_OUTLINE_ROUNDED, size=18), on_click=self.open_about_dialog),
+                        ft.MenuItemButton(content=ft.Text("사용 가이드", size=12), leading=ft.Icon(ft.Icons.HELP_OUTLINE_ROUNDED, size=16), on_click=self.open_help_dialog, style=item_style, height=25),
+                        ft.MenuItemButton(content=ft.Text("프로그램 정보", size=12), leading=ft.Icon(ft.Icons.INFO_OUTLINE_ROUNDED, size=16), on_click=self.open_about_dialog, style=item_style, height=25),
                     ],
                 ),
             ],
         )
 
         # ===== 헤더 =====
-        title_label = ft.Text("KODEX 200 AI Predictor", size=24, weight=ft.FontWeight.BOLD, color="#E0E6ED")
+        self.title_label = ft.Text("KODEX 200 AI Predictor", size=24, weight=ft.FontWeight.BOLD, color="#000000")
+        init_date_color = "#7C3AED"
+        self.subtitle_date_span = ft.TextSpan(f"{datetime.datetime.now().strftime('%Y년 %m월 %d일 %H시 %M분')} 기준", style=ft.TextStyle(color=init_date_color, weight=ft.FontWeight.BOLD))
         self.subtitle_label = ft.Text(
             spans=[
-                ft.TextSpan(f"{datetime.datetime.now().strftime('%Y년 %m월 %d일 %H시 %M분')} 기준", style=ft.TextStyle(color="#AEEA00", weight=ft.FontWeight.BOLD)),
-                ft.TextSpan(" 한일 선물, 대형주, VIX 공포지수 및 실시간 뉴스/루머를 종합 분석하여 가중치가 반영된 최종 등락을 예측합니다.")
+                self.subtitle_date_span,
+                ft.TextSpan(" 한일 선물, 대형주, VIX 공포지수 및 실시간 뉴스/주가 변동 요인을 종합 분석하여 가중치가 반영된 최종 등락을 예측합니다.")
             ],
             size=11,
-            color="#8A99AD"
+            color="#64748B"
         )
 
         # ===== 최종 결과 카드 =====
@@ -143,12 +248,15 @@ class StockPredictorApp:
         self.result_diff = ft.Text("", size=13, color="#B0C4DE")
 
         weights_str = "AI 50% │ 매크로 30% │ 뉴스 15% │ 소문 5%"
+        self.consensus_title_icon = ft.Icon(ft.Icons.ANALYTICS_ROUNDED, size=16, color="#C084FC")
+        self.consensus_title_text = ft.Text("최종 종합 예측 결과", size=13, color="#C084FC", weight=ft.FontWeight.BOLD)
+
         self.consensus_box = ft.Container(
             content=ft.Column([
                 ft.Row([
                     ft.Row([
-                        ft.Icon(ft.Icons.ANALYTICS_ROUNDED, size=16, color="#AEEA00"),
-                        ft.Text("최종 종합 예측 결과", size=13, color="#AEEA00", weight=ft.FontWeight.BOLD),
+                        self.consensus_title_icon,
+                        self.consensus_title_text,
                     ], spacing=6),
                     ft.Text(f"가중치: {weights_str}", size=10, color="#8A99AD", italic=True),
                 ], alignment=ft.MainAxisAlignment.SPACE_BETWEEN),
@@ -159,8 +267,9 @@ class StockPredictorApp:
                     ft.Column([self.result_pct, self.result_price], spacing=1, alignment=ft.MainAxisAlignment.CENTER),
                 ], alignment=ft.MainAxisAlignment.SPACE_AROUND, vertical_alignment=ft.CrossAxisAlignment.CENTER),
             ], spacing=5),
-            bgcolor="#1A2333", padding=ft.Padding(left=15, right=15, top=10, bottom=10), border_radius=12,
-            border=ft.Border.all(1, "#2E3A4E"), width=574, height=120,
+            bgcolor="#FFFFFF", padding=ft.Padding(left=15, right=15, top=10, bottom=10), border_radius=12,
+            border=ft.Border.all(2, "#40C4FF"), width=631, height=110,
+            on_hover=self.handle_body_hover,
         )
 
         # ===== 국내 기초자산 =====
@@ -171,9 +280,12 @@ class StockPredictorApp:
         self.hynix_price = ft.Text("SK하이닉스: - 원", size=13, color="#E0E6ED")
         self.hynix_change = ft.Text("(-%)", size=11, color="#8A99AD")
 
-        kodex_box = ft.Container(
+        self.kodex_title_icon = ft.Icon(ft.Icons.FLAG_CIRCLE_ROUNDED, size=16, color="#C084FC")
+        self.kodex_title_text = ft.Text("주가 변동 요인", size=13, color="#C084FC", weight=ft.FontWeight.BOLD)
+
+        self.kodex_box = ft.Container(
             content=ft.Column([
-                ft.Row([ft.Icon(ft.Icons.FLAG_CIRCLE_ROUNDED, size=16, color="#AEEA00"), ft.Text("국내 기초자산 및 대형주", size=13, color="#AEEA00", weight=ft.FontWeight.BOLD)], spacing=6),
+                ft.Row([self.kodex_title_icon, self.kodex_title_text], spacing=6),
                 ft.Divider(color="#2E3A4E", thickness=1, height=1),
                 ft.Row([self.kodex_price, self.kodex_change], spacing=8),
                 ft.Row([
@@ -182,14 +294,23 @@ class StockPredictorApp:
                     ft.Column([self.hynix_price, self.hynix_change], spacing=1),
                 ], alignment=ft.MainAxisAlignment.SPACE_BETWEEN),
             ], spacing=4),
-            bgcolor="#1A2333", padding=ft.Padding(left=12, right=12, top=10, bottom=10), border_radius=12,
-            border=ft.Border.all(1, "#2E3A4E"), width=574, height=120,
+            bgcolor="#FFFFFF", padding=ft.Padding(left=12, right=12, top=10, bottom=10), border_radius=12,
+            border=ft.Border.all(1, "#78909C"), width=631, height=110,
+            on_hover=self.handle_body_hover,
         )
 
+        # ===== 국내 기임 텍스트 컴색 수정 =====
+        self.kodex_price.color = "#0F172A"
+        self.kodex_change.color = "#0F172A"
+        self.samsung_price.color = "#1E293B"
+        self.samsung_change.color = "#64748B"
+        self.hynix_price.color = "#1E293B"
+        self.hynix_change.color = "#64748B"
+
         # ===== 주가 차트 영역 =====
-        self.kodex_chart = ft.Image(src="chart", width=574, height=220, fit=ft.BoxFit.CONTAIN)
+        self.kodex_chart = ft.Image(src="chart", width=631, height=154, fit=ft.BoxFit.CONTAIN)
         self.kodex_chart.src_base64 = "R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7"
-        self.kospi_chart = ft.Image(src="chart", width=574, height=220, fit=ft.BoxFit.CONTAIN)
+        self.kospi_chart = ft.Image(src="chart", width=631, height=154, fit=ft.BoxFit.CONTAIN)
         self.kospi_chart.src_base64 = "R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7"
 
         # ===== 실행 컨트롤 =====
@@ -197,9 +318,14 @@ class StockPredictorApp:
         self.status_msg = ft.Text("", color="#8A99AD", size=13)
 
         self.run_btn = ft.ElevatedButton(
-            content=ft.Row([ft.Icon(ft.Icons.PLAY_ARROW_ROUNDED, color="#121824", size=16), ft.Text("분석 실행", size=15, weight=ft.FontWeight.BOLD, color="#121824")], alignment=ft.MainAxisAlignment.CENTER, spacing=4),
-            style=ft.ButtonStyle(color={"hovered": "#FFFFFF", "": "#121824"}, bgcolor={"hovered": "#00C853", "": "#00E676"}, shape=ft.RoundedRectangleBorder(radius=10)),
-            width=126, height=44, on_click=self.run_analysis,
+            content=ft.Row([ft.Icon(ft.Icons.PLAY_ARROW_ROUNDED, color="#000000", size=16), ft.Text("분석 실행", size=17, weight=ft.FontWeight.BOLD, color="#000000", font_family="Malgun Gothic")], alignment=ft.MainAxisAlignment.CENTER, spacing=4),
+            style=ft.ButtonStyle(
+                color={"hovered": "#FFFFFF", "": "#000000"}, 
+                bgcolor={"hovered": "#00C853", "": "#00E676"}, 
+                shape=ft.RoundedRectangleBorder(radius=5),
+                padding=ft.Padding(left=2, right=2, top=0, bottom=0)
+            ),
+            width=126, height=31, on_click=self.run_analysis,
         )
 
         # ===== AI 카드 =====
@@ -232,114 +358,235 @@ class StockPredictorApp:
         self.news_lv = ft.ListView(expand=True, spacing=4, padding=5)
         self.rumors_lv = ft.ListView(expand=True, spacing=4, padding=5)
 
+        self.news_title_icon = ft.Icon(ft.Icons.ARTICLE_ROUNDED, size=16, color="#C084FC")
+        self.news_title_text = ft.Text("실시간 속보 뉴스 (15%)", size=13, color="#C084FC", weight=ft.FontWeight.BOLD)
+
         self.news_box = ft.Container(
             content=ft.Column([
                 ft.Row([
-                    ft.Icon(ft.Icons.ARTICLE_ROUNDED, size=16, color="#AEEA00"),
-                    ft.Text("실시간 속보 뉴스 (15%)", size=13, color="#AEEA00", weight=ft.FontWeight.BOLD),
+                    self.news_title_icon,
+                    self.news_title_text,
                 ], spacing=6),
                 ft.Divider(color="#2E3A4E", thickness=1, height=1),
-                ft.Container(content=self.news_lv, expand=True),
+                ft.Container(content=self.news_lv, expand=True, on_hover=self.handle_body_hover, bgcolor="#00000000"),
             ], spacing=4),
-            bgcolor="#1A2333", padding=12, border_radius=15,
-            border=ft.Border.all(1, "#2E3A4E"), width=574, height=170,
+            bgcolor="#FFFFFF", padding=12, border_radius=15,
+            border=ft.Border.all(1, "#78909C"), width=631, height=155,
+            on_hover=self.handle_body_hover,
         )
+
+        self.rumor_title_icon = ft.Icon(ft.Icons.RECORD_VOICE_OVER, size=16, color="#C084FC")
+        self.rumor_title_text = ft.Text("증권가 소문/이슈 (5%)", size=13, color="#C084FC", weight=ft.FontWeight.BOLD)
 
         self.rumor_box = ft.Container(
             content=ft.Column([
                 ft.Row([
-                    ft.Icon(ft.Icons.RECORD_VOICE_OVER, size=16, color="#AEEA00"),
-                    ft.Text("증권가 소문/이슈 (5%)", size=13, color="#AEEA00", weight=ft.FontWeight.BOLD),
+                    self.rumor_title_icon,
+                    self.rumor_title_text,
                 ], spacing=6),
                 ft.Divider(color="#2E3A4E", thickness=1, height=1),
-                ft.Container(content=self.rumors_lv, expand=True),
+                ft.Container(content=self.rumors_lv, expand=True, on_hover=self.handle_body_hover, bgcolor="#00000000"),
             ], spacing=4),
-            bgcolor="#1A2333", padding=12, border_radius=15,
-            border=ft.Border.all(1, "#2E3A4E"), width=574, height=170,
+            bgcolor="#FFFFFF", padding=12, border_radius=15,
+            border=ft.Border.all(1, "#78909C"), width=631, height=155,
+            on_hover=self.handle_body_hover,
         )
 
         # ===== 모니터링 로그 =====
         self.monitor_lv = ft.ListView(expand=True, spacing=3, padding=8, auto_scroll=True)
         self.monitor_lv.controls.append(ft.Text("[시스템] 프로그램 초기화 완료. '파일 > 분석 실행' 또는 버튼을 클릭하세요.", size=12, color="#8A99AD", selectable=True))
 
-        monitor_box = ft.Container(
+        self.monitor_title_icon = ft.Icon(ft.Icons.MONITOR_HEART_OUTLINED, size=16, color="#C084FC")
+        self.monitor_title_text = ft.Text("모니터링 로그", size=13, color="#C084FC", weight=ft.FontWeight.BOLD)
+
+        self.monitor_box = ft.Container(
             content=ft.Column([
                 ft.Row([
-                    ft.Icon(ft.Icons.MONITOR_HEART_OUTLINED, size=16, color="#AEEA00"),
-                    ft.Text("모니터링 로그", size=13, color="#AEEA00", weight=ft.FontWeight.BOLD),
-                    ft.Container(expand=True),
+                    self.monitor_title_icon,
+                    self.monitor_title_text,
                     ft.IconButton(icon=ft.Icons.DELETE_SWEEP_ROUNDED, icon_size=16, icon_color="#8A99AD", tooltip="로그 지우기", on_click=lambda _: self._clear_log()),
                 ], spacing=6),
                 ft.Divider(color="#2E3A4E", thickness=1, height=1),
-                ft.Container(content=self.monitor_lv, expand=True),
+                ft.Container(content=self.monitor_lv, expand=True, on_hover=self.handle_body_hover, bgcolor="#00000000"),
             ], spacing=4),
-            bgcolor="#111820", padding=10, border_radius=12,
-            border=ft.Border.all(1, "#1E2A3A"), width=1160, height=220,
+            bgcolor="#F8FAFC", padding=10, border_radius=12,
+            border=ft.Border.all(1, "#455A64"), width=631, height=218,
+            on_hover=self.handle_body_hover,
         )
+
+        # ===== 예측 적중률 및 분석 이력 (우측 분리 박스) =====
+        self.accuracy_lv = ft.ListView(expand=True, spacing=4, padding=5)
+        self.accuracy_label = ft.Text("적중률: -% (0/0)", size=12, color="#C084FC", weight=ft.FontWeight.BOLD)
+        
+        self.accuracy_title_icon = ft.Icon(ft.Icons.QUERY_STATS, size=16, color="#C084FC")
+        self.accuracy_title_text = ft.Text("예측 적중률 및 분석 이력", size=13, color="#C084FC", weight=ft.FontWeight.BOLD)
+
+        self.accuracy_box = ft.Container(
+            content=ft.Column([
+                ft.Row([
+                    ft.Row([
+                        self.accuracy_title_icon,
+                        self.accuracy_title_text,
+                        ft.IconButton(icon=ft.Icons.DELETE_SWEEP_ROUNDED, icon_size=16, icon_color="#8A99AD", tooltip="이력 지우기", on_click=lambda _: self._clear_history()),
+                    ], spacing=6),
+                    self.accuracy_label,
+                ], alignment=ft.MainAxisAlignment.SPACE_BETWEEN, vertical_alignment=ft.CrossAxisAlignment.CENTER),
+                ft.Divider(color="#2E3A4E", thickness=1, height=1),
+                ft.Container(content=self.accuracy_lv, expand=True, on_hover=self.handle_body_hover, bgcolor="#00000000"),
+            ], spacing=4),
+            bgcolor="#F8FAFC", padding=10, border_radius=12,
+            border=ft.Border.all(1, "#455A64"), width=631, height=218,
+            on_hover=self.handle_body_hover,
+        )
+
+        # ===== 테마 스위치 =====
+        self.theme_text = ft.Text("다크 모드", size=15, weight=ft.FontWeight.BOLD, color="#000000")
+        self.theme_switch = CustomSwitch(
+            value=False,
+            on_change=self.toggle_theme
+        )
+        self.theme_control_row = ft.Row(
+            [self.theme_text, self.theme_switch],
+            spacing=0,
+            alignment=ft.MainAxisAlignment.SPACE_BETWEEN,
+            vertical_alignment=ft.CrossAxisAlignment.CENTER,
+            height=24,
+            width=126
+        )
+
+        # ===== 실행 및 테마 조절 컨트롤 영역 =====
+        run_control_row = ft.Row([self.progress_ring, self.run_btn], spacing=8, vertical_alignment=ft.CrossAxisAlignment.CENTER)
+        theme_and_run_col = ft.Column([
+            run_control_row,
+            self.theme_control_row
+        ], spacing=4, horizontal_alignment=ft.CrossAxisAlignment.END)
+
+        self.ai_section_icon = ft.Icon(ft.Icons.PSYCHOLOGY_ROUNDED, size=16, color="#C084FC")
+        self.ai_section_text = ft.Text("AI 분석 결과 (50%)", size=13, color="#C084FC", weight=ft.FontWeight.BOLD)
+
+        self.macro_section_icon = ft.Icon(ft.Icons.PUBLIC_ROUNDED, size=16, color="#C084FC")
+        self.macro_section_text = ft.Text("주가 변동 인자 분석 (30%)", size=13, color="#C084FC", weight=ft.FontWeight.BOLD)
 
         # ===== 페이지 조립 =====
         body = ft.Column([
             ft.Row([
-                ft.Column([title_label, self.subtitle_label], spacing=4, expand=True),
-                ft.Row([self.progress_ring, self.run_btn], spacing=8, vertical_alignment=ft.CrossAxisAlignment.CENTER)
-            ], alignment=ft.MainAxisAlignment.SPACE_BETWEEN, width=1160),
+                ft.Column([self.title_label, self.subtitle_label], spacing=4, expand=True),
+                theme_and_run_col
+            ], alignment=ft.MainAxisAlignment.SPACE_BETWEEN, width=1274),
             ft.Divider(color="#2E3A4E", thickness=1, height=1),
-            ft.Row([self.consensus_box, kodex_box], spacing=12),
+            ft.Row([self.consensus_box, self.kodex_box], spacing=12),
             ft.Row([
                 self.status_msg,
-            ], alignment=ft.MainAxisAlignment.START, width=1160),
+            ], alignment=ft.MainAxisAlignment.START, width=1274),
             ft.Row([
-                ft.Icon(ft.Icons.PSYCHOLOGY_ROUNDED, size=16, color="#AEEA00"),
-                ft.Text("4대 핵심 AI 가중치 반영 실시간 예측 분석 (50%)", size=13, color="#AEEA00", weight=ft.FontWeight.BOLD)
+                self.ai_section_icon,
+                self.ai_section_text
             ], spacing=6),
             ft.Row(controls=[self.ai_cards["Gemini"], self.ai_cards["ChatGPT"], self.ai_cards["Claude"], self.ai_cards["Grok"]], spacing=12),
             ft.Row([
-                ft.Icon(ft.Icons.PUBLIC_ROUNDED, size=16, color="#AEEA00"),
-                ft.Text("글로벌 선물/공포지수/환율/일본상황 실시간 대시보드 (30%)", size=13, color="#AEEA00", weight=ft.FontWeight.BOLD)
+                self.macro_section_icon,
+                self.macro_section_text
             ], spacing=6),
             ft.Row(controls=mc, spacing=10),
             ft.Row([self.news_box, self.rumor_box], spacing=12),
-            monitor_box,
-        ], spacing=12, width=1160)
+            ft.Row([self.monitor_box, self.accuracy_box], spacing=12),
+        ], spacing=6, width=1274)
 
-        # 1. 세로 스크롤을 제공하는 Column (높이를 동적으로 조절하여 붕괴 방지)
-        self.vertical_scroll = ft.Column(
-            [ft.Container(content=body, padding=ft.Padding(left=20, right=20, top=0, bottom=10))],
-            scroll=ft.ScrollMode.AUTO,
-            width=1200
+        # 1. 세로 Stack (마우스 휠 스크롤 원천 차단 및 절대 고정)
+        self.vertical_scroll_content = ft.Container(
+            content=body,
+            padding=ft.Padding(left=15, right=8, top=0, bottom=10),
+            top=0,
+            left=0,
+            width=1297,
+            on_hover=self.handle_body_hover
         )
-        win_height = self.page.window.height
-        if not win_height or win_height < 500:
-            win_height = 950
-        self.vertical_scroll.height = win_height - 80
-
-        # 2. 가로 스크롤을 제공하는 Row (menubar 아래 영역 전체를 채움)
-        self.scrollable_body = ft.Row(
-            [self.vertical_scroll],
-            scroll=ft.ScrollMode.AUTO,
+        self.vertical_scroll = ft.Stack(
+            [self.vertical_scroll_content],
+            width=1297,
             expand=True,
-            vertical_alignment=ft.CrossAxisAlignment.STRETCH
+            clip_behavior=ft.ClipBehavior.HARD_EDGE
+        )
+        # expand=True 사용: Flet이 남은 창 높이를 자동 계산하여 빈 공간 발생 방지
+
+        # 우측 가상 스크롤바 역할을 할 커스텀 제스처 드래그바 정의
+        is_dark = self.page.theme_mode == ft.ThemeMode.DARK
+        accent_color = "#C084FC" if is_dark else "#7C3AED"
+        border_card = "#2E3A4E" if is_dark else "#78909C"
+
+        scroll_handle_color = "#7E8B9B" if is_dark else "#B0BEC5"
+        self.scroll_handle = ft.Container(
+            width=12,
+            height=80,
+            bgcolor=scroll_handle_color,
+            border_radius=6
+        )
+        self.scroll_detector = ft.GestureDetector(
+            content=self.scroll_handle,
+            on_pan_update=self.handle_drag_scroll,
+            drag_interval=10,
+            top=0
+        )
+        self.scroll_rail_bg = ft.Container(
+            width=12,
+            height=700,
+            bgcolor="transparent",
+            border_radius=6,
+            border=None
+        )
+        self.scroll_rail = ft.Container(
+            content=ft.Stack(
+                [
+                    self.scroll_rail_bg,
+                    self.scroll_detector
+                ],
+                width=12,
+                height=700
+            ),
+            margin=ft.Margin(left=0, top=0, right=8, bottom=0)
+        )
+
+        # 2. 가로 Row (스크롤바 없이 화면에 고정)
+        self.scrollable_body = ft.Row(
+            [self.vertical_scroll, self.scroll_rail],
+            scroll=None,
+            expand=True,
+            vertical_alignment=ft.CrossAxisAlignment.START,
+            spacing=0
         )
 
         self.page.scroll = None
         self.page.on_resize = self.handle_resize
 
         self.page.add(
-            ft.Column([menubar, self.scrollable_body], spacing=0, expand=True)
+            ft.Column([self.menubar, self.scrollable_body], spacing=0, expand=True)
         )
+        self.page.window.width = 1340
+        self.page.window.height = 980
+        self.page.window.min_width = 1340
+        self.page.window.min_height = 980
+        try:
+            self.page.update()
+        except Exception:
+            pass
+        self._log(f"✔ UI 레이아웃 로드 완료 - 메인 폭: 1274px, 창 너비: {self.page.window.width}px")
 
     # ─── 카드 헬퍼 ───
     def _mk_ai_card(self, name, color):
         lp = ft.Text("- %", size=18, weight=ft.FontWeight.BOLD, color="#B0C4DE")
         lprice = ft.Text("- 원", size=14, color="#E0E6ED")
-        lr = ft.Text("대기 중...", size=11, color="#8A99AD")
+        lr = ft.Text("대기 중...", size=11, color="#FFFFFF", no_wrap=False, text_align=ft.TextAlign.JUSTIFY)
         c = ft.Container(
             content=ft.Column([
                 ft.Row([ft.Container(width=10, height=10, bgcolor=color, border_radius=5), ft.Text(name, size=13, weight=ft.FontWeight.BOLD, color="#E0E6ED")], spacing=8),
                 ft.Divider(color="#2E3A4E", thickness=1), lp, lprice,
-                ft.Container(content=lr),
+                ft.Container(
+                    content=ft.Column([lr], scroll=ft.ScrollMode.AUTO, expand=True),
+                    expand=True
+                ),
             ], spacing=4),
-            bgcolor="#1A2333", padding=12, border_radius=12, border=ft.Border.all(1, "#2E3A4E"), width=281, height=200,
+            bgcolor="#1A2333", padding=12, border_radius=12, border=ft.Border.all(1, "#2E3A4E"), width=309, height=218,
+            on_hover=self.handle_body_hover
         )
         c.data = {"pct": lp, "price": lprice, "reason": lr}
         return c
@@ -349,7 +596,8 @@ class StockPredictorApp:
         lp = ft.Text("-", size=11, color="#8A99AD")
         c = ft.Container(
             content=ft.Column([ft.Text(title, size=11, color="#8A99AD"), lv, lp], spacing=2, alignment=ft.MainAxisAlignment.CENTER),
-            bgcolor="#1A2333", padding=8, border_radius=10, border=ft.Border.all(1, "#2E3A4E"), width=120, height=80,
+            bgcolor="#1A2333", padding=8, border_radius=10, border=ft.Border.all(1, "#2E3A4E"), width=132, height=82,
+            on_hover=self.handle_body_hover
         )
         c.data = {"val": lv, "pct": lp}
         return c
@@ -359,6 +607,21 @@ class StockPredictorApp:
     def _clear_log(self):
         self.monitor_lv.controls.clear()
         self.page.update()
+
+    def _clear_history(self):
+        history_file = BASE_DIR / "history.json"
+        if history_file.exists():
+            try:
+                with open(history_file, "w", encoding="utf-8") as f:
+                    json.dump([], f, indent=2, ensure_ascii=False)
+            except Exception:
+                pass
+        self.accuracy_lv.controls.clear()
+        self.accuracy_label.value = "적중률: -% (0/0)"
+        self._log("✔ 분석 이력이 모두 초기화되었습니다.")
+        self.page.update()
+
+
 
     # ─── 메뉴 액션 ───
     def open_reports_folder(self, e):
@@ -424,7 +687,7 @@ class StockPredictorApp:
         self.status_msg.value = "대형주, 한일 선물지수, 환율 및 공포지수 크롤링 중..."
         self.page.update()
         self._log("▶ 분석 시작: 데이터 수집 개시...")
-        threading.Thread(target=self._do_analysis, daemon=True).start()
+        self.page.run_thread(self._do_analysis)
 
     def _do_analysis(self):
         try:
@@ -437,13 +700,13 @@ class StockPredictorApp:
 
             self.kodex_price.value = f"KODEX200: {k['current_price']:,} 원"
             self.kodex_change.value = f"{k['change_pct']:+.2f} %"
-            self.kodex_change.color = "#FF3D00" if k["change_pct"] < 0 else "#00E676" if k["change_pct"] > 0 else "#8A99AD"
+            self.kodex_change.color = "#2979FF" if k["change_pct"] < 0 else "#FF1744" if k["change_pct"] > 0 else "#8A99AD"
             self.samsung_price.value = f"삼성전자: {hw['Samsung']['price']:,}원"
             self.samsung_change.value = f"{hw['Samsung']['change_pct']:+.2f}%"
-            self.samsung_change.color = "#FF3D00" if hw["Samsung"]["change_pct"] < 0 else "#00E676" if hw["Samsung"]["change_pct"] > 0 else "#8A99AD"
+            self.samsung_change.color = "#2979FF" if hw["Samsung"]["change_pct"] < 0 else "#FF1744" if hw["Samsung"]["change_pct"] > 0 else "#8A99AD"
             self.hynix_price.value = f"SK하이닉스: {hw['Hynix']['price']:,}원"
             self.hynix_change.value = f"{hw['Hynix']['change_pct']:+.2f}%"
-            self.hynix_change.color = "#FF3D00" if hw["Hynix"]["change_pct"] < 0 else "#00E676" if hw["Hynix"]["change_pct"] > 0 else "#8A99AD"
+            self.hynix_change.color = "#2979FF" if hw["Hynix"]["change_pct"] < 0 else "#FF1744" if hw["Hynix"]["change_pct"] > 0 else "#8A99AD"
 
             fmt = {
                 "Kospi_Future": lambda v: f"{v:,.2f}", "Nasdaq_Future": lambda v: f"{v:,.2f}",
@@ -456,14 +719,29 @@ class StockPredictorApp:
                 val, pct = m[key]["value"], m[key]["change_pct"]
                 card.data["val"].value = fmt[key](val)
                 card.data["pct"].value = f"{pct:+.2f}%"
-                card.data["pct"].color = "#FF3D00" if pct < 0 else "#00E676" if pct > 0 else "#8A99AD"
+                card.data["pct"].color = "#2979FF" if pct < 0 else "#FF1744" if pct > 0 else "#8A99AD"
+
+            is_dark = self.page.theme_mode == ft.ThemeMode.DARK
+            text_color = "#E0E6ED" if is_dark else "#000000"
 
             self.news_lv.controls.clear()
             for t in self.current_data["news"]:
-                self.news_lv.controls.append(ft.Row([ft.Icon(ft.Icons.ARTICLE_ROUNDED, size=14, color="#8A99AD"), ft.Text(t, size=11, color="#E0E6ED", max_lines=1, overflow=ft.TextOverflow.ELLIPSIS, expand=True)], spacing=6))
+                self.news_lv.controls.append(
+                    ft.Container(
+                        content=ft.Row([ft.Icon(ft.Icons.ARTICLE_ROUNDED, size=14, color="#8A99AD"), ft.Text(t, size=11, color=text_color, max_lines=1, overflow=ft.TextOverflow.ELLIPSIS, expand=True)], spacing=6),
+                        on_hover=self.handle_box_hover,
+                        bgcolor="#00000000"
+                    )
+                )
             self.rumors_lv.controls.clear()
             for t in self.current_data["rumors"]:
-                self.rumors_lv.controls.append(ft.Row([ft.Icon(ft.Icons.RECORD_VOICE_OVER, size=14, color="#8A99AD"), ft.Text(t, size=11, color="#E0E6ED", italic=True, max_lines=1, overflow=ft.TextOverflow.ELLIPSIS, expand=True)], spacing=6))
+                self.rumors_lv.controls.append(
+                    ft.Container(
+                        content=ft.Row([ft.Icon(ft.Icons.RECORD_VOICE_OVER, size=14, color="#8A99AD"), ft.Text(t, size=11, color=text_color, max_lines=1, overflow=ft.TextOverflow.ELLIPSIS, expand=True)], spacing=6),
+                        on_hover=self.handle_box_hover,
+                        bgcolor="#00000000"
+                    )
+                )
 
             self._log(f"✔ 데이터 수집 완료 - KODEX200: {k['current_price']:,}원 ({k['change_pct']:+.2f}%)")
             self.status_msg.value = "AI 모델 분석 시뮬레이션 및 API 응답 수립 중..."
@@ -478,7 +756,7 @@ class StockPredictorApp:
                 r = self.ai_results[mdl]
                 c = self.ai_cards[mdl]
                 c.data["pct"].value = f"{r['change_pct']:+.2f} %"
-                c.data["pct"].color = "#FF3D00" if r["change_pct"] < 0 else "#00E676" if r["change_pct"] > 0 else "#8A99AD"
+                c.data["pct"].color = "#2979FF" if r["change_pct"] < 0 else "#FF1744" if r["change_pct"] > 0 else "#8A99AD"
                 c.data["price"].value = f"{r['target_price']:,} 원"
                 c.data["reason"].value = r["reason"]
                 self._log(f"  {mdl}: {r['change_pct']:+.2f}% → {r['target_price']:,}원")
@@ -493,34 +771,24 @@ class StockPredictorApp:
             cp = self.consensus_result["change_pct"]
             tp = self.consensus_result["target_price"]
 
-            if d == "UP":
-                self.result_status.value = "상승 전망 ▲"
-                self.result_status.color = "#00E676"
-                self.consensus_box.border = ft.Border.all(2, "#00E676")
-                self.result_pct.color = "#00E676"
-                self.result_diff.color = "#00E676"
-            else:
-                self.result_status.value = "하락 전망 ▼"
-                self.result_status.color = "#AEEA00"
-                self.consensus_box.border = ft.Border.all(2, "#AEEA00")
-                self.result_pct.color = "#AEEA00"
-                self.result_diff.color = "#AEEA00"
+            # 기록 파일에 저장
+            self.record_prediction_in_history(
+                self.current_data["timestamp"],
+                k["current_price"],
+                d,
+                tp,
+                cp
+            )
+            # UI에 적중률 및 히스토리 업데이트
+            self.load_history_ui()
 
-            self.result_pct.value = f"{cp:+.2f} %"
-            self.result_price.value = f"예상 시가: {tp:,} 원"
-            diff = tp - k["current_price"]
-            self.result_diff.value = f"오늘 대비 {diff:+,}원 변동"
-            self.result_price.color = "#B0C4DE"
+            # 최종 결과 UI 표시
+            self.display_analysis_results()
 
-            now_str = datetime.datetime.now().strftime("%Y년 %m월 %d일 %H시 %M분")
-            self.subtitle_label.spans = [
-                ft.TextSpan(f"{now_str} 기준", style=ft.TextStyle(color="#AEEA00", weight=ft.FontWeight.BOLD)),
-                ft.TextSpan(" 한일 선물, 대형주, VIX 공포지수 및 실시간 뉴스/루머를 종합 분석하여 가중치가 반영된 최종 등락을 예측합니다.")
-            ]
             self.status_msg.value = "분석 완료. [파일 > 보고서 저장]에서 보고서를 내보낼 수 있습니다."
             self._log(f"★ 최종: {'상승' if d=='UP' else '하락'} {cp:+.2f}% → 예상 시초가 {tp:,}원")
             # 차트 최신 데이터 갱신
-            threading.Thread(target=self.load_charts, daemon=True).start()
+            self.page.run_thread(self.load_charts)
 
         except Exception as ex:
             import traceback; traceback.print_exc()
@@ -545,12 +813,609 @@ class StockPredictorApp:
             self._log(f"✘ 보고서 저장 실패: {ex}")
             self.show_snack_bar(f"저장 실패: {ex}", "#FF3D00")
 
+    def handle_box_hover(self, e):
+        pass
+
+    def handle_menu_open(self, e):
+        self.is_menu_open = True
+
+    def handle_menu_close(self, e):
+        self.is_menu_open = False
+
+    def handle_body_hover(self, e):
+        if e.data == "true":
+            self.menubar.visible = False
+            self.page.update()
+            self.menubar.visible = True
+            self.page.update()
+            self.is_menu_open = False
+
+    def handle_dashboard_scroll(self, e):
+        pass
+
+    def handle_drag_scroll(self, e):
+        delta_y = 0.0
+        if e.local_delta is not None:
+            delta_y = float(e.local_delta.y)
+        elif e.primary_delta is not None:
+            delta_y = float(e.primary_delta)
+
+        current_top = float(self.scroll_detector.top) if self.scroll_detector.top is not None else 0.0
+        new_top = current_top + delta_y
+        
+        max_top = 700.0 - 80.0
+        if new_top < 0:
+            new_top = 0.0
+        elif new_top > max_top:
+            new_top = max_top
+            
+        self.scroll_detector.top = new_top
+        
+        ratio = new_top / max_top
+        
+        # Calculate dynamic scroll height to ensure we can scroll precisely to the bottom
+        content_height = 960.0
+        viewport_height = float(self.vertical_scroll.height) if self.vertical_scroll.height is not None else 900.0
+        dynamic_max_scroll = max(0.0, content_height - viewport_height)
+        
+        target_offset = ratio * dynamic_max_scroll
+        self.last_scroll_offset = target_offset
+
+        # Stack 내부 Container의 top을 직접 이동시켜 스크롤
+        self.vertical_scroll_content.top = -target_offset
+        try:
+            self.scroll_detector.update()
+            self.vertical_scroll_content.update()
+        except Exception:
+            pass
+
+    # ─── 테마 스위치 및 관련 핸들러 ───
+    def toggle_theme(self, e):
+        is_dark = self.theme_switch.value
+        self.page.theme_mode = ft.ThemeMode.DARK if is_dark else ft.ThemeMode.LIGHT
+        self.update_theme_colors(is_dark)
+
+    def update_theme_colors(self, is_dark: bool):
+        bg_main = "#121824" if is_dark else "#F4F6F9"
+        bg_card = "#1A2333" if is_dark else "#FFFFFF"
+        border_card = "#2E3A4E" if is_dark else "#78909C"
+        text_primary = "#E0E6ED" if is_dark else "#000000"
+        text_secondary = "#8A99AD" if is_dark else "#64748B"
+        
+        # 하단 박스 (로그 / 적중률)
+        bg_lower = "#111820" if is_dark else "#F8FAFC"
+        border_lower = "#1E2A3A" if is_dark else "#455A64"
+        
+        # 메뉴바 배경 및 텍스트 색상
+        bg_menu = bg_main
+        self.menubar.style = ft.MenuStyle(
+            bgcolor=bg_menu,
+            elevation=0,
+            shadow_color="transparent",
+            shape=ft.RoundedRectangleBorder(radius=0),
+            side=ft.BorderSide(0, "transparent")
+        )
+        self.menu_file_text.color = text_primary
+        self.menu_setting_text.color = text_primary
+        self.menu_help_text.color = text_primary
+
+        # 메뉴바 하위 메뉴 및 항목들의 테두리/배경색/패딩 업데이트
+        menu_border = "#2E3A4E" if is_dark else "#E2E8F0"
+        menu_bg = "#1A2333" if is_dark else "#FFFFFF"
+        hover_bg = "#2E3A4E" if is_dark else "#F1F5F9"
+        text_color = "#E0E6ED" if is_dark else "#000000"
+        for submenu in self.menubar.controls:
+            if isinstance(submenu, ft.SubmenuButton):
+                submenu.menu_style = ft.MenuStyle(
+                    bgcolor=menu_bg,
+                    side=ft.BorderSide(1, menu_border),
+                    shape=ft.RoundedRectangleBorder(radius=8),
+                    padding=ft.Padding(left=4, top=2, right=4, bottom=2),
+                    shadow_color="black" if is_dark else "#CCCCCC",
+                    elevation=8
+                )
+                if submenu.controls:
+                    for item in submenu.controls:
+                        if isinstance(item, ft.MenuItemButton):
+                            item.height = 25
+                            if item.content:
+                                item.content.size = 12
+                            if item.leading:
+                                item.leading.size = 16
+                            item.style = ft.ButtonStyle(
+                                shape=ft.RoundedRectangleBorder(radius=4),
+                                padding=ft.Padding(left=8, right=8, top=0, bottom=0),
+                                side=ft.BorderSide(0, "transparent"),
+                                bgcolor={
+                                    "hovered": hover_bg,
+                                    "": "transparent"
+                                },
+                                color={
+                                    "": text_color
+                                }
+                            )
+        
+        # 새로운 밝은 보라색 악센트 컬러 적용
+        accent_color = "#C084FC" if is_dark else "#7C3AED"
+        self.theme_switch.bgcolor = "#2196F3" if is_dark else "#475569"
+        self.theme_switch.border = ft.Border.all(1, "#78909C")
+
+        self.page.bgcolor = bg_main
+        
+        # 타이틀 및 서브타이틀 색상
+        self.title_label.color = text_primary
+        self.theme_text.color = "#FFFFFF" if is_dark else "#000000"
+        if self.subtitle_label.spans:
+            for i, span in enumerate(self.subtitle_label.spans):
+                if i == 0:
+                    span.style = ft.TextStyle(color=accent_color, weight=ft.FontWeight.BOLD)
+                else:
+                    span.style = ft.TextStyle(color="#8A99AD" if is_dark else "#64748B")
+                    
+        # 박스 제목 및 아이콘 악센트 색상 변경
+        self.consensus_title_icon.color = accent_color
+        self.consensus_title_text.color = accent_color
+        self.kodex_title_icon.color = accent_color
+        self.kodex_title_text.color = accent_color
+        self.news_title_icon.color = accent_color
+        self.news_title_text.color = accent_color
+        self.rumor_title_icon.color = accent_color
+        self.rumor_title_text.color = accent_color
+        self.monitor_title_icon.color = accent_color
+        self.monitor_title_text.color = accent_color
+        self.accuracy_title_icon.color = accent_color
+        self.accuracy_title_text.color = accent_color
+        self.accuracy_label.color = accent_color
+        self.ai_section_icon.color = accent_color
+        self.ai_section_text.color = accent_color
+        self.macro_section_icon.color = accent_color
+        self.macro_section_text.color = accent_color
+
+        # 컨센서스 박스
+        self.consensus_box.bgcolor = bg_card
+        if self.consensus_result is None:
+            self.consensus_box.border = ft.Border.all(2, "#40C4FF")
+        self.result_price.color = "#B0C4DE" if is_dark else "#475569"
+            
+        # 국내 기초자산 박스 (주가 변동 요인)
+        self.kodex_box.bgcolor = bg_card
+        self.kodex_box.border = ft.Border.all(1, border_card)
+        self.kodex_price.color = "#FFFFFF" if is_dark else "#0F172A"
+        self.samsung_price.color = text_primary
+        self.hynix_price.color = text_primary
+        
+        # AI 카드 색상 조정
+        for mdl, card in self.ai_cards.items():
+            card.bgcolor = bg_card
+            card.border = ft.Border.all(1, border_card)
+            card.content.controls[0].controls[1].color = text_primary
+            card.content.controls[1].color = border_card
+            if card.data["pct"].color not in ["#FF1744", "#2979FF"]:
+                card.data["pct"].color = "#B0C4DE" if is_dark else "#475569"
+            card.data["price"].color = text_primary
+            card.data["reason"].color = "#FFFFFF" if is_dark else "#0F172A"
+            
+        # 매크로 카드 색상 조정
+        for key, card in self.macro_cards.items():
+            card.bgcolor = bg_card
+            card.border = ft.Border.all(1, border_card)
+            card.content.controls[0].color = text_secondary
+            card.content.controls[1].color = text_primary
+            if card.data["pct"].color not in ["#FF1744", "#2979FF"]:
+                card.data["pct"].color = text_secondary
+
+        # 뉴스 & 변동요인 박스
+        self.news_box.bgcolor = bg_card
+        self.news_box.border = ft.Border.all(1, border_card)
+        self.rumor_box.bgcolor = bg_card
+        self.rumor_box.border = ft.Border.all(1, border_card)
+        
+        # 뉴스 및 변동요인 목록 텍스트 색상 업데이트
+        for container in self.news_lv.controls:
+            if isinstance(container, ft.Container) and isinstance(container.content, ft.Row):
+                row = container.content
+                if len(row.controls) > 1:
+                    row.controls[1].color = text_primary
+        for container in self.rumors_lv.controls:
+            if isinstance(container, ft.Container) and isinstance(container.content, ft.Row):
+                row = container.content
+                if len(row.controls) > 1:
+                    row.controls[1].color = text_primary
+
+        # 모니터링 로그 텍스트 색상 업데이트
+        log_text_color = "#B0C4DE" if is_dark else "#000000"
+        for item in self.monitor_lv.controls:
+            if isinstance(item, ft.Container) and isinstance(item.content, ft.Text):
+                item.content.color = log_text_color
+            elif isinstance(item, ft.Text):
+                item.color = "#8A99AD" if is_dark else "#64748B"
+
+        # 하단 모니터링 로그 및 적중률 박스
+        self.monitor_box.bgcolor = bg_lower
+        self.monitor_box.border = ft.Border.all(1, border_lower)
+        self.accuracy_box.bgcolor = bg_lower
+        self.accuracy_box.border = ft.Border.all(1, border_lower)
+        
+        # 우측 가상 스크롤바 색상 업데이트
+        self.scroll_handle.bgcolor = "#7E8B9B" if is_dark else "#B0BEC5"
+        self.scroll_rail_bg.bgcolor = "transparent"
+        self.scroll_rail_bg.border = None
+        try:
+            self.scroll_handle.update()
+            self.scroll_rail_bg.update()
+        except Exception:
+            pass
+        
+        # 히스토리 리스트 갱신
+        self.load_history_ui()
+        self.page.update()
+
+    # ─── 과거 적중률 및 분석 이력 관리 (history.json) ───
+    def load_history_ui(self):
+        # 1. Verification of pending predictions
+        self.verify_pending_predictions()
+        
+        history_file = BASE_DIR / "history.json"
+        if not history_file.exists():
+            self.update_history_with_yfinance()
+            
+        history = []
+        try:
+            with open(history_file, "r", encoding="utf-8") as f:
+                history = json.load(f)
+        except Exception:
+            pass
+            
+        history = list(reversed(history))
+        
+        # Calculate stats
+        verified = [item for item in history if item.get("result") in ["적중", "실패"]]
+        hits = sum(1 for item in verified if item.get("result") == "적중")
+        total = len(verified)
+        
+        is_dark = self.page.theme_mode == ft.ThemeMode.DARK
+        
+        if total > 0:
+            rate = (hits / total) * 100
+            self.accuracy_label.value = f"적중률: {rate:.1f}% ({hits}/{total})"
+        else:
+            self.accuracy_label.value = "적중률: -% (0/0)"
+            
+        self.accuracy_lv.controls.clear()
+        
+        for item in history:
+            date_str = item.get("date", "")
+            short_date = date_str.split(" ")[0] if " " in date_str else date_str
+            
+            p_dir = item.get("predicted_direction", "")
+            t_price = item.get("target_price", 0)
+            a_open = item.get("actual_open")
+            res = item.get("result", "")
+            
+            if res == "적중":
+                badge_color = "#00C853"
+                badge_text = "적중"
+            elif res == "실패":
+                badge_color = "#D32F2F"
+                badge_text = "실패"
+            else:
+                badge_color = "#E0A800"
+                badge_text = "대기"
+                
+            dir_text = "상승 ▲" if p_dir == "UP" else "하락 ▼" if p_dir == "DOWN" else "보합"
+            dir_color = "#FF1744" if p_dir == "UP" else "#2979FF" if p_dir == "DOWN" else "#8A99AD"
+            
+            actual_str = f"실제: {a_open:,}원" if a_open else "실제: 대기"
+            
+            row_control = ft.Container(
+                content=ft.Row([
+                    ft.Text(short_date, size=11, color="#8A99AD" if is_dark else "#64748B"),
+                    ft.Text(f"예측: {dir_text}", size=11, color=dir_color, weight=ft.FontWeight.BOLD),
+                    ft.Text(f"목표: {t_price:,}원", size=11, color="#E0E6ED" if is_dark else "#000000"),
+                    ft.Text(actual_str, size=11, color="#8A99AD" if is_dark else "#64748B"),
+                    ft.Container(
+                        content=ft.Text(badge_text, size=9, color="#FFFFFF", weight=ft.FontWeight.BOLD),
+                        bgcolor=badge_color,
+                        padding=ft.Padding(left=6, right=6, top=2, bottom=2),
+                        border_radius=4,
+                    )
+                ], alignment=ft.MainAxisAlignment.SPACE_BETWEEN, vertical_alignment=ft.CrossAxisAlignment.CENTER),
+                padding=ft.Padding(left=6, right=6, top=6, bottom=6),
+                bgcolor="#1A2333" if is_dark else "#F1F5F9",
+                border_radius=6,
+                border=ft.Border.all(1, "#2E3A4E" if is_dark else "#78909C"),
+                on_hover=self.handle_box_hover,
+            )
+            self.accuracy_lv.controls.append(row_control)
+            
+        try:
+            self.page.update()
+        except Exception:
+            pass
+
+    def update_history_with_yfinance(self):
+        history_file = BASE_DIR / "history.json"
+        mock_history = [
+            {
+                "date": "2026-06-08 15:00:00",
+                "current_price": 321200,
+                "predicted_direction": "UP",
+                "target_price": 323500,
+                "predicted_change_pct": 0.72,
+                "actual_open": 324100,
+                "actual_direction": "UP",
+                "result": "적중"
+            },
+            {
+                "date": "2026-06-09 15:00:00",
+                "current_price": 324100,
+                "predicted_direction": "DOWN",
+                "target_price": 322000,
+                "predicted_change_pct": -0.65,
+                "actual_open": 322500,
+                "actual_direction": "DOWN",
+                "result": "적중"
+            },
+            {
+                "date": "2026-06-10 15:00:00",
+                "current_price": 322500,
+                "predicted_direction": "UP",
+                "target_price": 324500,
+                "predicted_change_pct": 0.62,
+                "actual_open": 321800,
+                "actual_direction": "DOWN",
+                "result": "실패"
+            },
+            {
+                "date": "2026-06-11 15:00:00",
+                "current_price": 321800,
+                "predicted_direction": "UP",
+                "target_price": 323800,
+                "predicted_change_pct": 0.62,
+                "actual_open": 322900,
+                "actual_direction": "UP",
+                "result": "적중"
+            }
+        ]
+        try:
+            with open(history_file, "w", encoding="utf-8") as f:
+                json.dump(mock_history, f, indent=2, ensure_ascii=False)
+        except Exception:
+            pass
+
+    def verify_pending_predictions(self):
+        history_file = BASE_DIR / "history.json"
+        if not history_file.exists():
+            return
+        try:
+            with open(history_file, "r", encoding="utf-8") as f:
+                history = json.load(f)
+        except Exception:
+            return
+            
+        pending_exists = any(item.get("result") == "대기 중" for item in history)
+        if not pending_exists:
+            return
+            
+        try:
+            ticker = yf.Ticker(TICKER_KODEX200)
+            df = ticker.history(period="1mo")
+            if df.empty:
+                return
+            
+            updated = False
+            for item in history:
+                if item.get("result") != "대기 중":
+                    continue
+                pred_date_str = item["date"].split(" ")[0]
+                pred_dt = datetime.datetime.strptime(pred_date_str, "%Y-%m-%d").date()
+                
+                trading_days = [d.date() for d in df.index]
+                next_days = [d for d in trading_days if d > pred_dt]
+                if not next_days:
+                    continue
+                    
+                next_trading_day = min(next_days)
+                row = df.loc[str(next_trading_day)]
+                if isinstance(row, pd.DataFrame):
+                    row = row.iloc[0]
+                actual_open = int(row["Open"])
+                
+                current_price = item["current_price"]
+                actual_dir = "UP" if actual_open > current_price else "DOWN" if actual_open < current_price else "FLAT"
+                
+                item["actual_open"] = actual_open
+                item["actual_direction"] = actual_dir
+                
+                pred_dir = item["predicted_direction"]
+                if pred_dir == actual_dir:
+                    item["result"] = "적중"
+                else:
+                    item["result"] = "실패"
+                updated = True
+                
+            if updated:
+                with open(history_file, "w", encoding="utf-8") as f:
+                    json.dump(history, f, indent=2, ensure_ascii=False)
+        except Exception as e:
+            print(f"[Warning] History verification failed: {e}")
+
+    def record_prediction_in_history(self, timestamp: str, current_price: int, pred_dir: str, target_price: int, pct: float):
+        history_file = BASE_DIR / "history.json"
+        history = []
+        if history_file.exists():
+            try:
+                with open(history_file, "r", encoding="utf-8") as f:
+                    history = json.load(f)
+            except Exception:
+                pass
+        
+        new_entry = {
+            "date": timestamp,
+            "current_price": current_price,
+            "predicted_direction": pred_dir,
+            "target_price": target_price,
+            "predicted_change_pct": pct,
+            "actual_open": None,
+            "actual_direction": None,
+            "result": "대기 중"
+        }
+        history.append(new_entry)
+        
+        try:
+            with open(history_file, "w", encoding="utf-8") as f:
+                json.dump(history, f, indent=2, ensure_ascii=False)
+        except Exception:
+            pass
+
+    # ─── 과거 보고서 불러오기 (열기) ───
+    def load_report_file(self, e):
+        try:
+            import tkinter as tk
+            from tkinter import filedialog
+            
+            # 메인 Tkinter 윈도우 생성 및 숨기기
+            root = tk.Tk()
+            root.withdraw()
+            # 파일 선택 창을 항상 위로 가져오기
+            root.attributes("-topmost", True)
+            
+            filepath = filedialog.askopenfilename(
+                title="과거 보고서 불러오기 (열기)",
+                initialdir=str(REPORTS_DIR),
+                filetypes=[("Markdown Files", "*.md"), ("All Files", "*.*")]
+            )
+            root.destroy()
+            
+            if filepath:
+                self.import_report_data(filepath)
+            else:
+                self._log("보고서 불러오기가 취소되었습니다.")
+        except Exception as ex:
+            self._log(f"✘ 보고서 불러오기 대화상자 열기 실패: {ex}")
+            self.show_snack_bar(f"대화상자 열기 실패: {ex}", "#FF3D00")
+
+    def import_report_data(self, filepath: str):
+        try:
+            with open(filepath, "r", encoding="utf-8") as f:
+                content = f.read()
+            
+            import re
+            match = re.search(r"<!-- RAW_DATA: (\{.*?\}) -->", content)
+            if match:
+                raw_data = json.loads(match.group(1))
+                self.current_data = raw_data["current_data"]
+                self.ai_results = raw_data["ai_results"]
+                self.consensus_result = raw_data["consensus_result"]
+                
+                self.display_analysis_results()
+                self._log(f"✔ 과거 보고서 로드 성공: {os.path.basename(filepath)}")
+                self.show_snack_bar(f"보고서 로드 완료: {os.path.basename(filepath)}", "#00C853")
+            else:
+                self._log("⚠ 불러온 보고서 파일에 복원용 원본 데이터(RAW_DATA)가 없습니다.")
+                self.show_snack_bar("로드 실패: 복원 데이터 누락", "#FF3D00")
+        except Exception as ex:
+            self._log(f"✘ 보고서 불러오기 실패: {ex}")
+            self.show_snack_bar(f"로드 실패: {ex}", "#FF3D00")
+
+    def display_analysis_results(self):
+        k = self.current_data["kodex200"]
+        hw = self.current_data["heavyweights"]
+        m = self.current_data["macro"]
+
+        self.kodex_price.value = f"KODEX200: {k['current_price']:,} 원"
+        self.kodex_change.value = f"{k['change_pct']:+.2f} %"
+        self.kodex_change.color = "#2979FF" if k["change_pct"] < 0 else "#FF1744" if k["change_pct"] > 0 else "#8A99AD"
+        self.samsung_price.value = f"삼성전자: {hw['Samsung']['price']:,}원"
+        self.samsung_change.value = f"{hw['Samsung']['change_pct']:+.2f}%"
+        self.samsung_change.color = "#2979FF" if hw["Samsung"]["change_pct"] < 0 else "#FF1744" if hw["Samsung"]["change_pct"] > 0 else "#8A99AD"
+        self.hynix_price.value = f"SK하이닉스: {hw['Hynix']['price']:,}원"
+        self.hynix_change.value = f"{hw['Hynix']['change_pct']:+.2f}%"
+        self.hynix_change.color = "#2979FF" if hw["Hynix"]["change_pct"] < 0 else "#FF1744" if hw["Hynix"]["change_pct"] > 0 else "#8A99AD"
+
+        fmt = {
+            "Kospi_Future": lambda v: f"{v:,.2f}", "Nasdaq_Future": lambda v: f"{v:,.2f}",
+            "SP500_Future": lambda v: f"{v:,.2f}", "USD_KRW": lambda v: f"{v:,.2f}",
+            "USD_JPY": lambda v: f"{v:,.2f}", "Nikkei_225": lambda v: f"{v:,.2f}",
+            "VIX_Index": lambda v: f"{v:.2f}", "US10Y_Treasury": lambda v: f"{v:.3f}%",
+            "WTI_Crude": lambda v: f"${v:.2f}",
+        }
+        for key, card in self.macro_cards.items():
+            val, pct = m[key]["value"], m[key]["change_pct"]
+            card.data["val"].value = fmt[key](val)
+            card.data["pct"].value = f"{pct:+.2f}%"
+            card.data["pct"].color = "#2979FF" if pct < 0 else "#FF1744" if pct > 0 else "#8A99AD"
+
+        is_dark = self.page.theme_mode == ft.ThemeMode.DARK
+        text_color = "#E0E6ED" if is_dark else "#000000"
+
+        self.news_lv.controls.clear()
+        for t in self.current_data["news"]:
+            self.news_lv.controls.append(
+                ft.Container(
+                    content=ft.Row([ft.Icon(ft.Icons.ARTICLE_ROUNDED, size=14, color="#8A99AD"), ft.Text(t, size=11, color=text_color, max_lines=1, overflow=ft.TextOverflow.ELLIPSIS, expand=True)], spacing=6),
+                    on_hover=self.handle_box_hover,
+                    bgcolor="#00000000"
+                )
+            )
+        
+        self.rumors_lv.controls.clear()
+        for t in self.current_data["rumors"]:
+            self.rumors_lv.controls.append(
+                ft.Container(
+                    content=ft.Row([ft.Icon(ft.Icons.RECORD_VOICE_OVER, size=14, color="#8A99AD"), ft.Text(t, size=11, color=text_color, max_lines=1, overflow=ft.TextOverflow.ELLIPSIS, expand=True)], spacing=6),
+                    on_hover=self.handle_box_hover,
+                    bgcolor="#00000000"
+                )
+            )
+
+        for mdl in ["Gemini", "ChatGPT", "Claude", "Grok"]:
+            r = self.ai_results[mdl]
+            c = self.ai_cards[mdl]
+            c.data["pct"].value = f"{r['change_pct']:+.2f} %"
+            c.data["pct"].color = "#2979FF" if r["change_pct"] < 0 else "#FF1744" if r["change_pct"] > 0 else "#8A99AD"
+            c.data["price"].value = f"{r['target_price']:,} 원"
+            c.data["reason"].value = r["reason"]
+            c.data["reason"].color = "#FFFFFF" if self.page.theme_mode == ft.ThemeMode.DARK else "#0F172A"
+
+        d = self.consensus_result["direction"]
+        cp = self.consensus_result["change_pct"]
+        tp = self.consensus_result["target_price"]
+
+        if d == "UP":
+            self.result_status.value = "상승 전망 ▲"
+            self.result_status.color = "#FF1744"
+            self.consensus_box.border = ft.Border.all(2, "#40C4FF")
+            self.result_pct.color = "#FF1744"
+            self.result_diff.color = "#FF1744"
+        else:
+            self.result_status.value = "하락 전망 ▼"
+            self.result_status.color = "#2979FF"
+            self.consensus_box.border = ft.Border.all(2, "#40C4FF")
+            self.result_pct.color = "#2979FF"
+            self.result_diff.color = "#2979FF"
+
+        self.result_pct.value = f"{cp:+.2f} %"
+        self.result_price.value = f"예상 시가: {tp:,} 원"
+        diff = tp - k["current_price"]
+        self.result_diff.value = f"오늘 대비 {diff:+,}원 변동"
+
+        try:
+            dt_obj = datetime.datetime.strptime(self.current_data["timestamp"], "%Y-%m-%d %H:%M:%S")
+            now_str = dt_obj.strftime("%Y년 %m월 %d일 %H시 %M분")
+        except Exception:
+            now_str = self.current_data["timestamp"]
+        
+        accent_color = "#C084FC" if is_dark else "#7C3AED"
+        self.subtitle_label.spans = [
+            ft.TextSpan(f"{now_str} 기준", style=ft.TextStyle(color=accent_color, weight=ft.FontWeight.BOLD)),
+            ft.TextSpan(" 한일 선물, 대형주, VIX 공포지수 및 실시간 뉴스/주가 변동 요인을 종합 분석하여 가중치가 반영된 최종 등락을 예측합니다.")
+        ]
+        self.page.update()
+
     def handle_resize(self, e):
         try:
-            h = self.page.window.height
-            if h and h >= 500:
-                self.vertical_scroll.height = h - 80
-                self.page.update()
+            self.page.update()
         except Exception:
             pass
 

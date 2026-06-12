@@ -91,45 +91,64 @@ class AIConsensusManager:
         
         current_price = k["current_price"]
         
-        # 신규 변수들을 포함한 정밀한 시뮬레이션 지수 계산
+        # 모델별 독립 분석 기준을 모방하여 가중치 배분 및 시뮬레이션 지수 계산
         score = 0.0
-        
-        # 1. 미국/한국 선물 변동 반영 (매우 중요)
-        score += m["Kospi_Future"]["change_pct"] * 1.8
-        score += m["Nasdaq_Future"]["change_pct"] * 1.2
-        
-        # 2. 영향력 대형주 반영
-        score += hw["Samsung"]["change_pct"] * 0.8
-        score += hw["Hynix"]["change_pct"] * 0.4
-        
-        # 3. 환율 및 공포 지수 반영 (환율/VIX 상승은 악재)
-        score -= m["USD_KRW"]["change_pct"] * 1.0
-        score -= (m["VIX_Index"]["value"] - 15.0) * 0.05  # VIX가 15 이상이면 하락 가속
-        
-        # 4. 일본 상황 반영 (엔/달러 상승(엔화 약세)은 수출 경합도 측면에서 한국 시장에 부정적, 닛케이 상승은 동조화 긍정적)
-        score -= m["USD_JPY"]["change_pct"] * 0.4
-        score += m["Nikkei_225"]["change_pct"] * 0.5
-        
-        rsi = k["rsi14"] or 50
-        if rsi < 30:
-            score += 0.6
-        elif rsi > 70:
-            score -= 0.6
-            
-        # 모델별 고유 편차(Seed 고정)
-        random.seed(hash(model_name + str(current_price)))
-        model_variance = random.uniform(-0.25, 0.25)
         
         # 루머/이슈에 따른 가중 편차 (특정 단어 존재 시 가산/감산)
         rumor_sentiment = 0.0
         for rum in rumors:
             if "공급" in rum or "호조" in rum or "유입" in rum or "비둘기" in rum:
-                rumor_sentiment += 0.15
+                rumor_sentiment += 0.2
             if "우려" in rum or "매파" in rum or "감소" in rum or "차질" in rum:
-                rumor_sentiment -= 0.15
-                
-        score += rumor_sentiment
-        predicted_pct = round((score * 0.6) + model_variance, 2)
+                rumor_sentiment -= 0.2
+        
+        # 모델별 차별화된 예측 공식 적용
+        if model_name == "Gemini":
+            # Gemini: 국내 대형주 흐름 + 코스피 선물 + 기술적 지표(RSI) 위주 분석
+            score += hw["Samsung"]["change_pct"] * 1.5
+            score += hw["Hynix"]["change_pct"] * 0.8
+            score += m["Kospi_Future"]["change_pct"] * 1.2
+            rsi = k["rsi14"] or 50
+            if rsi < 30:
+                score += 0.8
+            elif rsi > 70:
+                score -= 0.8
+            score += rumor_sentiment * 0.5
+            predicted_pct = round((score * 0.45), 2)
+            
+        elif model_name == "ChatGPT":
+            # ChatGPT: 글로벌/국내 선물 시장 상관성 위주 분석
+            score += m["Kospi_Future"]["change_pct"] * 1.8
+            score += m["Nasdaq_Future"]["change_pct"] * 1.4
+            score += m["SP500_Future"]["change_pct"] * 0.8
+            score -= (m["VIX_Index"]["value"] - 15.0) * 0.04
+            score += rumor_sentiment * 0.8
+            predicted_pct = round((score * 0.40), 2)
+            
+        elif model_name == "Claude":
+            # Claude: 거시 경제 지표 및 아시아 증시 동조성(환율, 일본 닛케이, 10년물 국채) 위주 분석
+            score += m["Nikkei_225"]["change_pct"] * 1.0
+            score -= m["USD_KRW"]["change_pct"] * 1.2
+            score -= m["USD_JPY"]["change_pct"] * 0.6
+            score -= m["US10Y_Treasury"]["change_pct"] * 0.4
+            score += hw["Samsung"]["change_pct"] * 0.6
+            score += rumor_sentiment * 0.6
+            predicted_pct = round((score * 0.50), 2)
+            
+        else: # Grok
+            # Grok: 뉴스 및 풍문 감성 지표 + 국제 유가 + 공포 지수(VIX) 위주 분석
+            score -= (m["VIX_Index"]["value"] - 15.0) * 0.12
+            score += m["WTI_Crude"]["change_pct"] * 0.8
+            score += m["Kospi_Future"]["change_pct"] * 0.8
+            score -= m["USD_KRW"]["change_pct"] * 0.5
+            score += rumor_sentiment * 1.5
+            predicted_pct = round((score * 0.60), 2)
+
+        # 모델별 고유 편차 추가 (동적 변동성 확보 및 Seed 고정)
+        random.seed(hash(model_name + str(current_price)))
+        model_variance = random.uniform(-0.35, 0.35)
+        
+        predicted_pct = round(predicted_pct + model_variance, 2)
         predicted_pct = max(-3.0, min(3.0, predicted_pct))
         
         direction = "UP" if predicted_pct >= 0 else "DOWN"
