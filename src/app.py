@@ -904,8 +904,8 @@ class StockPredictorApp:
             row_ctrl = ft.Container(
                 content=ft.Row([
                     ft.Text(d_str, size=10, color="#8A99AD" if is_dark else "#64748B", width=70),
-                    ft.Row(ai_status_row, spacing=4, alignment=ft.MainAxisAlignment.CENTER),
-                ], alignment=ft.MainAxisAlignment.SPACE_BETWEEN, vertical_alignment=ft.CrossAxisAlignment.CENTER),
+                    *ai_status_row
+                ], spacing=4, vertical_alignment=ft.CrossAxisAlignment.CENTER),
                 padding=6,
                 bgcolor="#111827" if is_dark else "#F3F4F6",
                 border_radius=6,
@@ -918,15 +918,16 @@ class StockPredictorApp:
             content=ft.Column([
                 ft.Row(stats_cards, alignment=ft.MainAxisAlignment.SPACE_BETWEEN),
                 ft.Divider(color=border_color, height=10),
-                ft.Row([
-                    ft.Text("분석 일자", size=10, weight=ft.FontWeight.BOLD, color="#8A99AD" if is_dark else "#64748B", width=70),
-                    ft.Row([
-                        ft.Container(content=ft.Text("Gemini", size=9, weight=ft.FontWeight.BOLD, color=colors["Gemini"], text_align=ft.TextAlign.CENTER), width=80),
-                        ft.Container(content=ft.Text("ChatGPT", size=9, weight=ft.FontWeight.BOLD, color=colors["ChatGPT"], text_align=ft.TextAlign.CENTER), width=80),
-                        ft.Container(content=ft.Text("Claude", size=9, weight=ft.FontWeight.BOLD, color=colors["Claude"], text_align=ft.TextAlign.CENTER), width=80),
-                        ft.Container(content=ft.Text("Grok", size=9, weight=ft.FontWeight.BOLD, color=colors["Grok"], text_align=ft.TextAlign.CENTER), width=80),
-                    ], spacing=4)
-                ], alignment=ft.MainAxisAlignment.SPACE_BETWEEN),
+                ft.Container(
+                    content=ft.Row([
+                        ft.Text("분석 일자", size=10, weight=ft.FontWeight.BOLD, color="#8A99AD" if is_dark else "#64748B", width=70),
+                        ft.Container(content=ft.Text("Gemini", size=9, weight=ft.FontWeight.BOLD, color=colors["Gemini"]), alignment=ft.alignment.center, width=80),
+                        ft.Container(content=ft.Text("ChatGPT", size=9, weight=ft.FontWeight.BOLD, color=colors["ChatGPT"]), alignment=ft.alignment.center, width=80),
+                        ft.Container(content=ft.Text("Claude", size=9, weight=ft.FontWeight.BOLD, color=colors["Claude"]), alignment=ft.alignment.center, width=80),
+                        ft.Container(content=ft.Text("Grok", size=9, weight=ft.FontWeight.BOLD, color=colors["Grok"]), alignment=ft.alignment.center, width=80),
+                    ], spacing=4),
+                    padding=ft.Padding(left=12, right=0, top=0, bottom=0)
+                ),
                 ft.Divider(color=border_color, height=5),
                 lv
             ], spacing=10, width=500, height=395, tight=True),
