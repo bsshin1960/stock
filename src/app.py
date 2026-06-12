@@ -594,9 +594,9 @@ class StockPredictorApp:
             "적중률 내역",
             size=10,
             color=accent_color,
-            decoration=ft.TextDecoration.UNDERLINE,
-            on_click=lambda e, m=model_name: self.show_ai_history_dialog(m)
+            style=ft.TextStyle(decoration=ft.TextDecoration.UNDERLINE)
         )
+        history_link.on_click = lambda e, m=model_name: self.show_ai_history_dialog(m)
         history_link.mouse_cursor = ft.MouseCursor.CLICK
         
         c = ft.Container(
