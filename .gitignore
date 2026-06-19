@@ -1,0 +1,14 @@
+.env
+__pycache__/
+*.pyc
+reports/
+settings.json
+.vscode/
+.idea/
+build/
+dist/
+scratch/
+*.spec
+*.log
+
+*.exe
