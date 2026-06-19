@@ -247,7 +247,7 @@ class StockPredictorApp:
 
         # ===== 헤더 =====
         self.title_label = ft.Text("KODEX 200 AI Predictor", size=24, weight=ft.FontWeight.BOLD, color="#000000")
-        self.version_label = ft.Text("Ver 0.1", size=14, weight=ft.FontWeight.BOLD, color="#64748B")
+        self.version_label = ft.Text("Ver 0.2", size=14, weight=ft.FontWeight.BOLD, color="#64748B")
         self.title_row = ft.Row([
             self.title_label,
             self.version_label
