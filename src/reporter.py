@@ -2,7 +2,7 @@
 import os
 import datetime
 from pathlib import Path
-from src.config import REPORTS_DIR
+from src.config import REPORTS_DIR, get_kst_now
 from src.ai_consensus import _get_configured_ai_weights
 
 class PredictionReporter:
@@ -13,7 +13,7 @@ class PredictionReporter:
 
     def generate_report(self, data: dict, ai_results: dict, consensus: dict) -> Path:
         """분석 결과를 깔끔한 마크다운 보고서로 작성하여 파일로 저장"""
-        now = datetime.datetime.now()
+        now = get_kst_now()
         timestamp_str = now.strftime("%Y-%m-%d %H:%M:%S")
         file_date_str = now.strftime("%Y%m%d_%H%M%S")
         
@@ -39,7 +39,7 @@ class PredictionReporter:
             time_part = timestamp_str.split(" ")[1]
             hour = int(time_part.split(":")[0])
         except Exception:
-            hour = datetime.datetime.now().hour
+            hour = get_kst_now().hour
             
         if hour < 9:
             target_title = "오전 9시"

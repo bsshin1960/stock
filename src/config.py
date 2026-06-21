@@ -163,3 +163,18 @@ CONSENSUS_WEIGHTS = {
 }
 
 
+# KST 시간 도우미 함수 (Huggingface 등 해외 서버 환경에서 한국 시간으로 일관되게 표시하기 위함)
+def get_kst_now():
+    """한국 시간(KST, UTC+9)의 현재 datetime을 timezone-naive 객체로 반환합니다.
+    다른 naive datetime 객체들과의 비교 및 호환을 위해 tzinfo를 제거합니다.
+    """
+    from datetime import datetime, timezone, timedelta
+    kst_tz = timezone(timedelta(hours=9))
+    return datetime.now(kst_tz).replace(tzinfo=None)
+
+def get_kst_today():
+    """한국 시간(KST) 기준의 오늘 날짜를 date 객체로 반환합니다."""
+    return get_kst_now().date()
+
+
+

@@ -9,7 +9,8 @@ from src.config import (
     TICKER_KOSPI_FUTURE, TICKER_NASDAQ_FUTURE,
     TICKER_USD_KRW, TICKER_USD_JPY, TICKER_GOLD, TICKER_US10Y, TICKER_WTI, TICKER_VIX,
     TICKER_SOX, TICKER_SHANGHAI, TICKER_DOLLAR, TICKER_US_CPI,
-    TICKER_NIKKEI, TICKER_EWY, TICKER_BITCOIN, TICKER_US_RATE, TICKER_NASDAQ
+    TICKER_NIKKEI, TICKER_EWY, TICKER_BITCOIN, TICKER_US_RATE, TICKER_NASDAQ,
+    get_kst_now, get_kst_today
 )
 
 class DataCollector:
@@ -321,9 +322,8 @@ class DataCollector:
         short_pct = -0.85
         try:
             if kodex_data and kodex_data.get("volume"):
-                import datetime
                 import numpy as np
-                np.random.seed(datetime.date.today().toordinal())
+                np.random.seed(get_kst_today().toordinal())
                 short_val = round((kodex_data["volume"] * 0.002) / 1000, 2)  # 천주 단위
                 short_pct = round(np.random.uniform(-2.5, 2.5), 2)
         except Exception:
@@ -337,9 +337,8 @@ class DataCollector:
         famous_val = 52.34
         famous_pct = 0.45
         try:
-            import datetime
             import numpy as np
-            np.random.seed(datetime.date.today().toordinal() + 10)
+            np.random.seed(get_kst_today().toordinal() + 10)
             famous_val = round(np.random.uniform(30.0, 70.0), 2)
             famous_pct = round(np.random.uniform(-3.0, 3.0), 2)
         except Exception:
@@ -422,7 +421,7 @@ class DataCollector:
             "[수급 소문] 글로벌 자산운용사 아시아 신흥국 펀드 비중 재조정으로 한국 시장에 3,000억 원 규모 외국인 패시브 자금 유입설"
         ]
         # 무작위로 2~3개의 그럴듯한 신뢰도 높은 소문을 선별
-        random_seed = int(datetime.datetime.now().strftime("%d"))
+        random_seed = int(get_kst_now().strftime("%d"))
         np.random.seed(random_seed)
         selected_indices = np.random.choice(len(rumor_pool), size=3, replace=False)
         rumors = [rumor_pool[idx] for idx in selected_indices]
@@ -442,7 +441,7 @@ class DataCollector:
         print("[System] 모든 데이터 수집 완료.")
 
         return {
-            "timestamp": datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+            "timestamp": get_kst_now().strftime("%Y-%m-%d %H:%M:%S"),
             "kodex200": kodex_data,
             "heavyweights": heavy_data,
             "macro": macro_data,
@@ -465,7 +464,7 @@ class DataCollector:
                 print(f"[Info] {ticker_symbol} 데이터가 비어 있어 모의 데이터를 생성합니다.")
                 import numpy as np
                 dates = []
-                current_date = datetime.datetime.now()
+                current_date = get_kst_now()
                 while len(dates) < 60:
                     current_date -= datetime.timedelta(days=1)
                     if current_date.weekday() < 5:

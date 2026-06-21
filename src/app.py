@@ -15,7 +15,7 @@ _yf_session.headers.update({
 from src.data_collector import DataCollector
 from src.ai_consensus import AIConsensusManager
 from src.reporter import PredictionReporter
-from src.config import DEFAULT_WEIGHTS, ENV_API_KEYS, REPORTS_DIR, BASE_DIR, TICKER_KODEX200, MACRO_LABELS
+from src.config import DEFAULT_WEIGHTS, ENV_API_KEYS, REPORTS_DIR, BASE_DIR, TICKER_KODEX200, MACRO_LABELS, get_kst_now, get_kst_today
 
 # --- 로컬 JSON 파일 기반 API Key 저장소 ---
 _SETTINGS_FILE = BASE_DIR / "settings.json"
@@ -146,7 +146,7 @@ class StockPredictorApp:
 
     # ─── 모니터링 로그 ───
     def _log(self, msg: str):
-        ts = datetime.datetime.now().strftime("%H:%M:%S")
+        ts = get_kst_now().strftime("%H:%M:%S")
         is_dark = self.page.theme_mode == ft.ThemeMode.DARK
         text_color = "#B0C4DE" if is_dark else "#000000"
         self.monitor_lv.controls.append(
@@ -259,7 +259,7 @@ class StockPredictorApp:
             color="#64748B"
         )
         init_date_color = "#7C3AED"
-        self.subtitle_date_span = ft.TextSpan(f"현재({datetime.datetime.now().strftime('%Y년 %m월 %d일 %H시 %M분')}) 기준", style=ft.TextStyle(color=init_date_color, weight=ft.FontWeight.BOLD))
+        self.subtitle_date_span = ft.TextSpan(f"현재({get_kst_now().strftime('%Y년 %m월 %d일 %H시 %M분')}) 기준", style=ft.TextStyle(color=init_date_color, weight=ft.FontWeight.BOLD))
         self.subtitle_label = ft.Text(
             spans=[
                 self.subtitle_date_span,
@@ -934,8 +934,7 @@ class StockPredictorApp:
                 is_dark = self.page.theme_mode == ft.ThemeMode.DARK
                 text_col = "#E0E6ED" if is_dark else "#0F172A"
                 
-                import datetime
-                base_date = datetime.date.today()
+                base_date = get_kst_today()
                 current_price = 32540
                 
                 import numpy as np
@@ -2135,7 +2134,7 @@ class StockPredictorApp:
                 
                 # 2. Look in intraday history (for today during trading hours)
                 if actual_open is None:
-                    now_local = datetime.datetime.now()
+                    now_local = get_kst_now()
                     if now_local.date() >= target_date and (now_local.date() > target_date or now_local.time() >= datetime.time(9, 0, 0)):
                         try:
                             df_intra = ticker.history(period="5d", interval="5m")

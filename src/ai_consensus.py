@@ -8,7 +8,7 @@ import traceback
 import google.generativeai as genai
 from openai import OpenAI
 from anthropic import Anthropic
-from src.config import DEFAULT_WEIGHTS, BASE_DIR, MACRO_WEIGHTS, BASE_MACRO_WEIGHTS
+from src.config import DEFAULT_WEIGHTS, BASE_DIR, MACRO_WEIGHTS, BASE_MACRO_WEIGHTS, get_kst_now
 
 def _get_configured_macro_weights(timestamp: str = None, macro_data: dict = None) -> dict:
     settings_file = BASE_DIR / "settings.json"
@@ -42,7 +42,7 @@ def _get_configured_macro_weights(timestamp: str = None, macro_data: dict = None
         except Exception:
             pass
     if dt is None:
-        dt = datetime.datetime.now()
+        dt = get_kst_now()
 
     # US DST 및 개장 여부 판단
     year = dt.year
@@ -357,12 +357,12 @@ class AIConsensusManager:
         weights_str = ", ".join([f"{model}: {weight*100:.1f}%" for model, weight in ai_weights.items()])
 
         timestamp_str = data.get("timestamp", "")
-        import datetime
         try:
             time_part = timestamp_str.split(" ")[1]
             hour = int(time_part.split(":")[0])
         except Exception:
-            hour = datetime.datetime.now().hour
+            hour = get_kst_now().hour
+
             
         if hour < 9:
             target_desc = "오늘(당일) 오전 9시 시초가(Open Price)"
@@ -901,12 +901,12 @@ class AIConsensusManager:
         consensus_weights_desc = f"AI {w_ai*100:.1f}% │ 매크로 {w_macro*100:.1f}% │ 뉴스 {w_news*100:.1f}% │ 소문 {w_rumor*100:.1f}%"
         
         timestamp_str = data.get("timestamp", "")
-        import datetime
         try:
             time_part = timestamp_str.split(" ")[1]
             hour = int(time_part.split(":")[0])
         except Exception:
-            hour = datetime.datetime.now().hour
+            hour = get_kst_now().hour
+
             
         target_day_desc = "오늘(당일) 오전 9시" if hour < 9 else "내일"
 
