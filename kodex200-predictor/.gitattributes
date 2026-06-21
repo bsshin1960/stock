@@ -1,0 +1,2 @@
+Kodex200_AI_Stock_Predictor.exe filter=lfs diff=lfs merge=lfs -text
+src/__pycache__/app.cpython-314.pyc filter=lfs diff=lfs merge=lfs -text
