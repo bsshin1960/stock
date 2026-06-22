@@ -102,7 +102,6 @@ class AIReasonWrapper:
             self.column.update()
             if self.row:
                 self.row.update()
-
             self.viewport.update()
         except Exception:
             pass
@@ -170,6 +169,7 @@ class StockPredictorApp:
         self.ai_reason_rows = {}
         self.ai_reason_viewports = {}
         self.ai_reason_vertical_columns = {}
+
 
 
         self.data_collector = DataCollector()
@@ -1071,7 +1071,6 @@ class StockPredictorApp:
         c.data = {"pct": lp, "price": lprice, "reason": lr_wrapper, "title_txt": title_txt}
         return c
 
-
     def _mk_macro_card(self, title, subtitle="", is_technical=False, hide_values=False):
         lv = ft.Text("" if (is_technical or hide_values) else "-", size=13, weight=ft.FontWeight.BOLD, color="#0F172A")
         lp = ft.Text("" if (is_technical or hide_values) else "-", size=11, color="#64748B")
@@ -1479,7 +1478,6 @@ class StockPredictorApp:
             reason_row.update()
         except Exception:
             pass
-
 
 
 
