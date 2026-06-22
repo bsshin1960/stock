@@ -788,10 +788,12 @@ class StockPredictorApp:
             self.vertical_scroll_content.content = body
             self.scroll_rail.visible = True
             self.vertical_scroll = self.dashboard_scroll_detector
+            self.vertical_scroll_column.width = 1297
         else:
             self.vertical_scroll_column.content.controls = [body]
             self.scroll_rail.visible = False
             self.vertical_scroll = self.vertical_scroll_column
+            self.vertical_scroll_column.width = None
 
         # 메뉴바와 세로 본문을 감싸는 대시보드 컬럼
         self.dashboard_column = ft.Column(
@@ -1437,6 +1439,7 @@ class StockPredictorApp:
             self.scroll_rail.visible = True
             self.vertical_scroll = self.dashboard_scroll_detector
             self.dashboard_column.controls[1] = self.dashboard_scroll_detector
+            self.vertical_scroll_column.width = 1297
             try:
                 self.update_scroll_dimensions()
             except Exception:
@@ -1447,6 +1450,7 @@ class StockPredictorApp:
             self.scroll_rail.visible = False
             self.vertical_scroll = self.vertical_scroll_column
             self.dashboard_column.controls[1] = self.vertical_scroll_column
+            self.vertical_scroll_column.width = None
         try:
             self.dashboard_column.update()
             self.scrollable_body.update()
