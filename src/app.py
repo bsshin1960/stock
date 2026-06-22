@@ -84,7 +84,11 @@ class AIReasonWrapper:
         lines = [line for line in text.split("\n") if line.strip()] if text else []
         if not lines:
             lines = ["대기 중..."]
-        lines = lines[:30]
+        # 내용물은 10개로 유지
+        lines = lines[:10]
+        # 나머지 20줄은 빈칸으로 채워 총 30줄 공간 구성
+        while len(lines) < 30:
+            lines.append(" ")
             
         max_width = 285
         for line in lines:
