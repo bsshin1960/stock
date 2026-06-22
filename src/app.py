@@ -2147,6 +2147,7 @@ class StockPredictorApp:
 
     def handle_body_hover(self, e):
         if e.data == "true":
+            self.is_box_hovered = False
             self.menubar.visible = False
             self.page.update()
             self.menubar.visible = True
