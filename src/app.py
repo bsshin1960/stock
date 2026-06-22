@@ -154,6 +154,8 @@ class StockPredictorApp:
         self.ai_reason_columns = {}
         self.ai_scroll_indices = {}
         self.last_ai_scroll_times = {}
+        self.ai_reason_detectors = {}
+        self.ai_reason_containers = {}
 
 
         self.data_collector = DataCollector()
@@ -441,11 +443,22 @@ class StockPredictorApp:
             height=83
         )
 
+        initial_top10_content = self.top10_lv if self.scroll_mode == "wheel" else self.top10_scroll_detector
+        if self.scroll_mode == "wheel":
+            self.top10_lv.scroll = ft.ScrollMode.ALWAYS
+            self.top10_lv.height = 83
+
+        self.top10_scroll_container = ft.Container(
+            content=initial_top10_content,
+            height=83,
+            on_hover=self.handle_scroll_box_hover
+        )
+
         self.top10_box = ft.Container(
             content=ft.Column([
                 ft.Row([self.top10_title_icon, self.top10_title_text], spacing=6),
                 ft.Divider(color="#CBD5E1", thickness=1, height=1),
-                self.top10_scroll_detector
+                self.top10_scroll_container
             ], spacing=4),
             bgcolor="#FFFFFF", padding=ft.Padding(left=12, right=12, top=10, bottom=10), border_radius=12,
             border=ft.Border.all(1, "#78909C"), width=309, height=135,
@@ -473,11 +486,22 @@ class StockPredictorApp:
             height=83
         )
 
+        initial_kodex_content = self.kodex_history_lv if self.scroll_mode == "wheel" else self.kodex_history_scroll_detector
+        if self.scroll_mode == "wheel":
+            self.kodex_history_lv.scroll = ft.ScrollMode.ALWAYS
+            self.kodex_history_lv.height = 83
+
+        self.kodex_history_scroll_container = ft.Container(
+            content=initial_kodex_content,
+            height=83,
+            on_hover=self.handle_scroll_box_hover
+        )
+
         self.dev_box = ft.Container(
             content=ft.Column([
                 ft.Row([self.kodex_history_title_icon, self.kodex_history_title_text], spacing=6),
                 ft.Divider(color="#CBD5E1", thickness=1, height=1),
-                self.kodex_history_scroll_detector
+                self.kodex_history_scroll_container
             ], spacing=4),
             bgcolor="#FFFFFF", padding=ft.Padding(left=12, right=12, top=10, bottom=10), border_radius=12,
             border=ft.Border.all(1, "#78909C"), width=309, height=135,
@@ -610,7 +634,7 @@ class StockPredictorApp:
                     self.news_title_text,
                 ], spacing=6),
                 ft.Divider(color="#2E3A4E", thickness=1, height=1),
-                ft.Container(content=self.news_lv, expand=True, on_hover=self.handle_body_hover, bgcolor="#00000000"),
+                ft.Container(content=self.news_lv, expand=True, on_hover=self.handle_scroll_box_hover, bgcolor="#00000000"),
             ], spacing=4),
             bgcolor="#FFFFFF", padding=12, border_radius=15,
             border=ft.Border.all(1, "#78909C"), width=631, height=140,
@@ -627,7 +651,7 @@ class StockPredictorApp:
                     self.rumor_title_text,
                 ], spacing=6),
                 ft.Divider(color="#2E3A4E", thickness=1, height=1),
-                ft.Container(content=self.rumors_lv, expand=True, on_hover=self.handle_body_hover, bgcolor="#00000000"),
+                ft.Container(content=self.rumors_lv, expand=True, on_hover=self.handle_scroll_box_hover, bgcolor="#00000000"),
             ], spacing=4),
             bgcolor="#FFFFFF", padding=12, border_radius=15,
             border=ft.Border.all(1, "#78909C"), width=631, height=140,
@@ -649,7 +673,7 @@ class StockPredictorApp:
                     ft.IconButton(icon=ft.Icons.DELETE_SWEEP_ROUNDED, icon_size=16, icon_color="#8A99AD", tooltip="로그 지우기", on_click=lambda _: self._clear_log()),
                 ], spacing=6),
                 ft.Divider(color="#2E3A4E", thickness=1, height=1),
-                ft.Container(content=self.monitor_lv, expand=True, on_hover=self.handle_body_hover, bgcolor="#00000000"),
+                ft.Container(content=self.monitor_lv, expand=True, on_hover=self.handle_scroll_box_hover, bgcolor="#00000000"),
             ], spacing=4),
             bgcolor="#F8FAFC", padding=10, border_radius=12,
             border=ft.Border.all(1, "#455A64"), width=631, height=196,
@@ -674,7 +698,7 @@ class StockPredictorApp:
                     self.accuracy_label,
                 ], alignment=ft.MainAxisAlignment.SPACE_BETWEEN, vertical_alignment=ft.CrossAxisAlignment.CENTER),
                 ft.Divider(color="#2E3A4E", thickness=1, height=1),
-                ft.Container(content=self.accuracy_lv, expand=True, on_hover=self.handle_body_hover, bgcolor="#00000000"),
+                ft.Container(content=self.accuracy_lv, expand=True, on_hover=self.handle_scroll_box_hover, bgcolor="#00000000"),
             ], spacing=4),
             bgcolor="#F8FAFC", padding=10, border_radius=12,
             border=ft.Border.all(1, "#455A64"), width=631, height=196,
@@ -934,6 +958,7 @@ class StockPredictorApp:
         self.ai_reason_columns[model_name] = reason_lv
         self.ai_scroll_indices[model_name] = 0
         self.last_ai_scroll_times[model_name] = 0.0
+        self.ai_reason_detectors[model_name] = reason_detector
         
         lr_wrapper = AIReasonWrapper(
             column=reason_lv,
@@ -971,6 +996,28 @@ class StockPredictorApp:
             )
         )
         
+        # Choose initial inner content for reasons based on scroll mode
+        if self.scroll_mode == "wheel":
+            reason_lv.scroll = ft.ScrollMode.ALWAYS
+            reason_box_content = ft.Container(
+                content=reason_lv,
+                on_hover=self.handle_scroll_box_hover
+            )
+        else:
+            reason_lv.scroll = None
+            reason_box_content = reason_detector
+            
+        reason_container = ft.Container(
+            content=ft.Row([
+                reason_box_content
+            ], scroll=ft.ScrollMode.ALWAYS, vertical_alignment=ft.CrossAxisAlignment.STRETCH, expand=True),
+            expand=True,
+            margin=ft.Margin(top=5),
+            theme=local_scrollbar_theme,
+            on_hover=self.handle_scroll_box_hover
+        )
+        self.ai_reason_containers[model_name] = reason_container
+        
         c = ft.Container(
             content=ft.Column([
                 ft.Row([
@@ -979,14 +1026,7 @@ class StockPredictorApp:
                 ], spacing=6, vertical_alignment=ft.CrossAxisAlignment.CENTER),
                 ft.Divider(color="#CBD5E1", thickness=1, height=1),
                 price_pct_row,
-                ft.Container(
-                    content=ft.Row([
-                        reason_detector
-                    ], scroll=ft.ScrollMode.ALWAYS, vertical_alignment=ft.CrossAxisAlignment.STRETCH, expand=True),
-                    expand=True,
-                    margin=ft.Margin(top=5),
-                    theme=local_scrollbar_theme
-                ),
+                reason_container,
             ], spacing=0),
             bgcolor="#FFFFFF", padding=ft.Padding(left=12, right=12, top=12, bottom=2), border_radius=12, border=ft.Border.all(1, "#78909C"), width=309, height=196,
             on_hover=self.handle_body_hover
@@ -1581,6 +1621,10 @@ class StockPredictorApp:
             self.dashboard_column.controls[1] = self.vertical_scroll_column
             self.vertical_scroll_column.width = None
         try:
+            self.apply_scroll_mode_to_inner_boxes()
+        except Exception:
+            pass
+        try:
             self.dashboard_column.update()
             self.scrollable_body.update()
             self.scroll_rail.update()
@@ -1953,6 +1997,76 @@ class StockPredictorApp:
 
     def handle_box_hover(self, e):
         pass
+
+    def handle_scroll_box_hover(self, e):
+        # 1. Close menubar dropdowns
+        self.handle_body_hover(e)
+        
+        # 2. Disable/enable dashboard scroll in wheel mode
+        if self.scroll_mode != "wheel":
+            return
+        is_hovered = (e.data == "true")
+        self.is_box_hovered = is_hovered
+        
+        scroll_col = self.vertical_scroll_column.content
+        if scroll_col:
+            scroll_col.scroll = None if is_hovered else ft.ScrollMode.AUTO
+            try:
+                scroll_col.update()
+            except Exception:
+                pass
+
+    def apply_scroll_mode_to_inner_boxes(self):
+        # 1. Update Top 10
+        if self.scroll_mode == "wheel":
+            self.top10_lv.scroll = ft.ScrollMode.ALWAYS
+            self.top10_lv.height = 83
+            self.top10_scroll_container.content = self.top10_lv
+            self.top10_lv.top = 0
+        else:
+            self.top10_lv.scroll = None
+            self.top10_lv.height = None
+            self.top10_scroll_container.content = self.top10_viewport
+            self.top10_lv.top = -self.top10_scroll_index * 17.0
+
+        # 2. Update Kodex History
+        if self.scroll_mode == "wheel":
+            self.kodex_history_lv.scroll = ft.ScrollMode.ALWAYS
+            self.kodex_history_lv.height = 83
+            self.kodex_history_scroll_container.content = self.kodex_history_lv
+            self.kodex_history_lv.top = 0
+        else:
+            self.kodex_history_lv.scroll = None
+            self.kodex_history_lv.height = None
+            self.kodex_history_scroll_container.content = self.kodex_history_viewport
+            self.kodex_history_lv.top = -self.kodex_history_scroll_index * 17.0
+
+        # 3. Update AI cards reason containers
+        for mdl in ["Gemini", "ChatGPT", "Claude", "Grok"]:
+            if mdl in self.ai_reason_columns:
+                reason_lv = self.ai_reason_columns[mdl]
+                reason_detector = self.ai_reason_detectors[mdl]
+                container = self.ai_reason_containers[mdl]
+                
+                if self.scroll_mode == "wheel":
+                    reason_lv.scroll = ft.ScrollMode.ALWAYS
+                    reason_lv.top = 0
+                    container.content.controls = [reason_lv]
+                else:
+                    reason_lv.scroll = None
+                    current_idx = self.ai_scroll_indices.get(mdl, 0)
+                    reason_lv.top = -current_idx * 21.0
+                    container.content.controls = [reason_detector]
+
+        # 4. Trigger UI update
+        try:
+            self.top10_scroll_container.update()
+            self.kodex_history_scroll_container.update()
+            for mdl in ["Gemini", "ChatGPT", "Claude", "Grok"]:
+                if mdl in self.ai_reason_containers:
+                    self.ai_reason_containers[mdl].update()
+        except Exception:
+            pass
 
     def handle_menu_open(self, e):
         self.is_menu_open = True
