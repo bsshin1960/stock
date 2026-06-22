@@ -975,6 +975,8 @@ class StockPredictorApp:
         reason_lv = ft.Column(
             spacing=0,
             width=275,
+            left=0,
+            top=0,
             animate_position=80
         )
         
@@ -992,7 +994,7 @@ class StockPredictorApp:
         # 2. Stack viewport wrapping the Column & scroll handle
         reason_viewport = ft.Stack(
             controls=[
-                ft.Container(content=reason_lv, width=275, top=0, left=0),
+                reason_lv,
                 ai_handle
             ],
             expand=True,
