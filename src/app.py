@@ -88,7 +88,7 @@ class AIReasonWrapper:
             
         max_width = 285
         for line in lines:
-            txt = ft.Text(line, size=11, color=self._color, no_wrap=True, style=ft.TextStyle(height=1.91))
+            txt = ft.Text(line, size=11, color=self._color, no_wrap=True, style=ft.TextStyle(height=21/11))
             self.column.controls.append(txt)
             line_w = len(line) * 7.5 + 20
             if line_w > max_width:
@@ -438,22 +438,32 @@ class StockPredictorApp:
         # ===== 시총 TOP10 주가 박스 =====
         self.top10_lv = ft.Column(
             spacing=2,
-            width=285,
-            height=83,
-            scroll=ft.ScrollMode.ALWAYS
+            top=0,
+            left=4,
+            right=4,
+            animate_position=150
         )
         self.top10_title_icon = ft.Icon(ft.Icons.LEADERBOARD_ROUNDED, size=16, color="#7C3AED")
         self.top10_title_text = ft.Text("시총 TOP10 회사 주가", size=13, color="#7C3AED", weight=ft.FontWeight.BOLD)
 
-        self.top10_horizontal_scroll = ft.Row(
-            [self.top10_lv],
-            scroll=ft.ScrollMode.ALWAYS,
-            height=83,
-            width=285
+        self.top10_viewport = ft.Stack([
+            self.top10_lv
+        ], expand=True, clip_behavior=ft.ClipBehavior.HARD_EDGE)
+
+        self.top10_scroll_detector = ft.GestureDetector(
+            content=self.top10_viewport,
+            on_scroll=self.handle_top10_wheel,
+            height=83
         )
 
+        initial_top10_content = self.top10_scroll_detector
+        if self.scroll_mode == "wheel":
+            self.top10_lv.scroll = ft.ScrollMode.ALWAYS
+            self.top10_lv.height = 83
+            self.top10_lv.top = 0
+
         self.top10_scroll_container = ft.Container(
-            content=self.top10_horizontal_scroll,
+            content=initial_top10_content,
             height=83,
             on_hover=self.handle_scroll_box_hover
         )
@@ -472,22 +482,32 @@ class StockPredictorApp:
         # ===== KODEX 200 1개월 일별 주가 박스 (기존 개발중 플레이스홀더 대체) =====
         self.kodex_history_lv = ft.Column(
             spacing=2,
-            width=285,
-            height=83,
-            scroll=ft.ScrollMode.ALWAYS
+            top=0,
+            left=4,
+            right=4,
+            animate_position=150
         )
         self.kodex_history_title_icon = ft.Icon(ft.Icons.TRENDING_UP_ROUNDED, size=16, color="#7C3AED")
         self.kodex_history_title_text = ft.Text("Kodex200 주가(1개월)", size=13, color="#7C3AED", weight=ft.FontWeight.BOLD)
         
-        self.kodex_history_horizontal_scroll = ft.Row(
-            [self.kodex_history_lv],
-            scroll=ft.ScrollMode.ALWAYS,
-            height=83,
-            width=285
+        self.kodex_history_viewport = ft.Stack([
+            self.kodex_history_lv
+        ], expand=True, clip_behavior=ft.ClipBehavior.HARD_EDGE)
+
+        self.kodex_history_scroll_detector = ft.GestureDetector(
+            content=self.kodex_history_viewport,
+            on_scroll=self.handle_kodex_history_wheel,
+            height=83
         )
 
+        initial_kodex_content = self.kodex_history_scroll_detector
+        if self.scroll_mode == "wheel":
+            self.kodex_history_lv.scroll = ft.ScrollMode.ALWAYS
+            self.kodex_history_lv.height = 83
+            self.kodex_history_lv.top = 0
+
         self.kodex_history_scroll_container = ft.Container(
-            content=self.kodex_history_horizontal_scroll,
+            content=initial_kodex_content,
             height=83,
             on_hover=self.handle_scroll_box_hover
         )
@@ -1009,13 +1029,21 @@ class StockPredictorApp:
             )
         )
         
-        # Ensure initial configuration matches scroll mode - Unified for both scrollbar and wheel mode
-        reason_horizontal_scroll.top = None
-        reason_horizontal_scroll.animate_position = None
-        reason_horizontal_scroll.height = 105
-        reason_lv.scroll = ft.ScrollMode.ALWAYS
-        reason_lv.height = 105
-        reason_container_content = reason_horizontal_scroll
+        # Ensure initial configuration matches scroll mode
+        if self.scroll_mode == "wheel":
+            reason_horizontal_scroll.top = None
+            reason_horizontal_scroll.animate_position = None
+            reason_horizontal_scroll.height = 105
+            reason_lv.scroll = ft.ScrollMode.HIDDEN
+            reason_lv.height = 105
+            reason_container_content = reason_horizontal_scroll
+        else:
+            reason_horizontal_scroll.top = 0
+            reason_horizontal_scroll.animate_position = 150
+            reason_horizontal_scroll.height = 105
+            reason_lv.scroll = None
+            reason_lv.height = None
+            reason_container_content = reason_detector
             
         reason_container = ft.Container(
             content=reason_container_content,
@@ -1422,13 +1450,6 @@ class StockPredictorApp:
             pass
 
     def handle_ai_reason_wheel(self, e: ft.ScrollEvent, model_name: str):
-        import time
-        now = time.time()
-        last_time = self.last_ai_scroll_times.get(model_name, 0.0)
-        if now - last_time < 0.15:
-            return
-        self.last_ai_scroll_times[model_name] = now
-
         direction = 1 if e.scroll_delta.y > 0 else -1
         visible_count = 5
         reason_lv = self.ai_reason_columns[model_name]
@@ -1443,8 +1464,9 @@ class StockPredictorApp:
         
         col = self.ai_reason_columns[model_name]
         item_height = 21.0
+        col.top = -new_idx * item_height
         try:
-            col.scroll_to(offset=new_idx * item_height, duration=80)
+            col.update()
         except Exception:
             pass
 
@@ -2030,29 +2052,46 @@ class StockPredictorApp:
                 pass
 
     def apply_scroll_mode_to_inner_boxes(self):
-        # 1. Update Top 10 - Force unified native scrolling
-        self.top10_lv.scroll = ft.ScrollMode.ALWAYS
-        self.top10_lv.height = 83
-        self.top10_lv.top = None
-        self.top10_scroll_container.content = self.top10_horizontal_scroll
+        # 1. Update Top 10
+        if self.scroll_mode == "wheel":
+            self.top10_lv.scroll = ft.ScrollMode.ALWAYS
+            self.top10_lv.height = 83
+            self.top10_lv.top = 0
+        else:
+            self.top10_lv.scroll = None
+            self.top10_lv.height = None
+            self.top10_lv.top = -self.top10_scroll_index * 17.0
 
-        # 2. Update Kodex History - Force unified native scrolling
-        self.kodex_history_lv.scroll = ft.ScrollMode.ALWAYS
-        self.kodex_history_lv.height = 83
-        self.kodex_history_lv.top = None
-        self.kodex_history_scroll_container.content = self.kodex_history_horizontal_scroll
+        # 2. Update Kodex History
+        if self.scroll_mode == "wheel":
+            self.kodex_history_lv.scroll = ft.ScrollMode.ALWAYS
+            self.kodex_history_lv.height = 83
+            self.kodex_history_lv.top = 0
+        else:
+            self.kodex_history_lv.scroll = None
+            self.kodex_history_lv.height = None
+            self.kodex_history_lv.top = -self.kodex_history_scroll_index * 17.0
 
-        # 3. Update AI cards reason containers - Unified scroll behavior for both modes
+        # 3. Update AI cards reason containers
         for mdl in ["Gemini", "ChatGPT", "Claude", "Grok"]:
             if mdl in self.ai_reason_containers:
                 container = self.ai_reason_containers[mdl]
+                detector = self.ai_reason_detectors[mdl]
+                viewport = self.ai_reason_viewports[mdl]
                 row = self.ai_reason_rows[mdl]
                 col = self.ai_reason_columns[mdl]
                 
-                col.scroll = ft.ScrollMode.ALWAYS
-                col.height = 105
-                col.top = None
-                container.content = row
+                if self.scroll_mode == "wheel":
+                    col.scroll = ft.ScrollMode.HIDDEN
+                    col.height = 105
+                    col.top = None
+                    container.content = row
+                else:
+                    col.scroll = None
+                    col.height = None
+                    current_idx = self.ai_scroll_indices.get(mdl, 0)
+                    col.top = -current_idx * 21.0
+                    container.content = row
 
 
         # 4. Trigger UI update
