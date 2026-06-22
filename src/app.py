@@ -438,32 +438,22 @@ class StockPredictorApp:
         # ===== 시총 TOP10 주가 박스 =====
         self.top10_lv = ft.Column(
             spacing=2,
-            top=0,
-            left=4,
-            right=4,
-            animate_position=150
+            width=285,
+            height=83,
+            scroll=ft.ScrollMode.ALWAYS
         )
         self.top10_title_icon = ft.Icon(ft.Icons.LEADERBOARD_ROUNDED, size=16, color="#7C3AED")
         self.top10_title_text = ft.Text("시총 TOP10 회사 주가", size=13, color="#7C3AED", weight=ft.FontWeight.BOLD)
 
-        self.top10_viewport = ft.Stack([
-            self.top10_lv
-        ], expand=True, clip_behavior=ft.ClipBehavior.HARD_EDGE)
-
-        self.top10_scroll_detector = ft.GestureDetector(
-            content=self.top10_viewport,
-            on_scroll=self.handle_top10_wheel,
-            height=83
+        self.top10_horizontal_scroll = ft.Row(
+            [self.top10_lv],
+            scroll=ft.ScrollMode.ALWAYS,
+            height=83,
+            width=285
         )
 
-        initial_top10_content = self.top10_scroll_detector
-        if self.scroll_mode == "wheel":
-            self.top10_lv.scroll = ft.ScrollMode.ALWAYS
-            self.top10_lv.height = 83
-            self.top10_lv.top = 0
-
         self.top10_scroll_container = ft.Container(
-            content=initial_top10_content,
+            content=self.top10_horizontal_scroll,
             height=83,
             on_hover=self.handle_scroll_box_hover
         )
@@ -482,32 +472,22 @@ class StockPredictorApp:
         # ===== KODEX 200 1개월 일별 주가 박스 (기존 개발중 플레이스홀더 대체) =====
         self.kodex_history_lv = ft.Column(
             spacing=2,
-            top=0,
-            left=4,
-            right=4,
-            animate_position=150
+            width=285,
+            height=83,
+            scroll=ft.ScrollMode.ALWAYS
         )
         self.kodex_history_title_icon = ft.Icon(ft.Icons.TRENDING_UP_ROUNDED, size=16, color="#7C3AED")
         self.kodex_history_title_text = ft.Text("Kodex200 주가(1개월)", size=13, color="#7C3AED", weight=ft.FontWeight.BOLD)
         
-        self.kodex_history_viewport = ft.Stack([
-            self.kodex_history_lv
-        ], expand=True, clip_behavior=ft.ClipBehavior.HARD_EDGE)
-
-        self.kodex_history_scroll_detector = ft.GestureDetector(
-            content=self.kodex_history_viewport,
-            on_scroll=self.handle_kodex_history_wheel,
-            height=83
+        self.kodex_history_horizontal_scroll = ft.Row(
+            [self.kodex_history_lv],
+            scroll=ft.ScrollMode.ALWAYS,
+            height=83,
+            width=285
         )
 
-        initial_kodex_content = self.kodex_history_scroll_detector
-        if self.scroll_mode == "wheel":
-            self.kodex_history_lv.scroll = ft.ScrollMode.ALWAYS
-            self.kodex_history_lv.height = 83
-            self.kodex_history_lv.top = 0
-
         self.kodex_history_scroll_container = ft.Container(
-            content=initial_kodex_content,
+            content=self.kodex_history_horizontal_scroll,
             height=83,
             on_hover=self.handle_scroll_box_hover
         )
@@ -1033,7 +1013,7 @@ class StockPredictorApp:
         reason_horizontal_scroll.top = None
         reason_horizontal_scroll.animate_position = None
         reason_horizontal_scroll.height = 105
-        reason_lv.scroll = ft.ScrollMode.HIDDEN
+        reason_lv.scroll = ft.ScrollMode.ALWAYS
         reason_lv.height = 105
         reason_container_content = reason_horizontal_scroll
             
@@ -2050,25 +2030,17 @@ class StockPredictorApp:
                 pass
 
     def apply_scroll_mode_to_inner_boxes(self):
-        # 1. Update Top 10
-        if self.scroll_mode == "wheel":
-            self.top10_lv.scroll = ft.ScrollMode.ALWAYS
-            self.top10_lv.height = 83
-            self.top10_lv.top = 0
-        else:
-            self.top10_lv.scroll = None
-            self.top10_lv.height = None
-            self.top10_lv.top = -self.top10_scroll_index * 17.0
+        # 1. Update Top 10 - Force unified native scrolling
+        self.top10_lv.scroll = ft.ScrollMode.ALWAYS
+        self.top10_lv.height = 83
+        self.top10_lv.top = None
+        self.top10_scroll_container.content = self.top10_horizontal_scroll
 
-        # 2. Update Kodex History
-        if self.scroll_mode == "wheel":
-            self.kodex_history_lv.scroll = ft.ScrollMode.ALWAYS
-            self.kodex_history_lv.height = 83
-            self.kodex_history_lv.top = 0
-        else:
-            self.kodex_history_lv.scroll = None
-            self.kodex_history_lv.height = None
-            self.kodex_history_lv.top = -self.kodex_history_scroll_index * 17.0
+        # 2. Update Kodex History - Force unified native scrolling
+        self.kodex_history_lv.scroll = ft.ScrollMode.ALWAYS
+        self.kodex_history_lv.height = 83
+        self.kodex_history_lv.top = None
+        self.kodex_history_scroll_container.content = self.kodex_history_horizontal_scroll
 
         # 3. Update AI cards reason containers - Unified scroll behavior for both modes
         for mdl in ["Gemini", "ChatGPT", "Claude", "Grok"]:
@@ -2077,7 +2049,7 @@ class StockPredictorApp:
                 row = self.ai_reason_rows[mdl]
                 col = self.ai_reason_columns[mdl]
                 
-                col.scroll = ft.ScrollMode.HIDDEN
+                col.scroll = ft.ScrollMode.ALWAYS
                 col.height = 105
                 col.top = None
                 container.content = row
