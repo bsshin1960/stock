@@ -90,7 +90,7 @@ class AIReasonWrapper:
             
         max_width = 285
         for line in lines:
-            txt = ft.Text(line, size=11, color=self._color, no_wrap=True, style=ft.TextStyle(height=1.1))
+            txt = ft.Text(line, size=11, color=self._color, no_wrap=True, style=ft.TextStyle(height=1.91))
             self.column.controls.append(txt)
             line_w = len(line) * 7.5 + 20
             if line_w > max_width:
@@ -964,7 +964,7 @@ class StockPredictorApp:
             scroll=ft.ScrollMode.ALWAYS,
             vertical_alignment=ft.CrossAxisAlignment.STRETCH,
             width=285,
-            height=122,
+            height=105,
             spacing=0
         )
         
@@ -974,7 +974,7 @@ class StockPredictorApp:
             expand=True,
             clip_behavior=ft.ClipBehavior.HARD_EDGE,
             width=285,
-            height=122
+            height=105
         )
         
         # 4. GestureDetector wrapping Stack viewport
@@ -1035,7 +1035,7 @@ class StockPredictorApp:
             v_col = ft.Column(
                 controls=[reason_horizontal_scroll],
                 scroll=ft.ScrollMode.ALWAYS,
-                height=122,
+                height=105,
                 width=285,
                 spacing=0
             )
@@ -1461,7 +1461,7 @@ class StockPredictorApp:
         self.last_ai_scroll_times[model_name] = now
 
         direction = 1 if e.scroll_delta.y > 0 else -1
-        visible_count = 10
+        visible_count = 5
         reason_lv = self.ai_reason_columns[model_name]
         total_items = len(reason_lv.controls)
         max_idx = total_items - visible_count
@@ -1473,7 +1473,7 @@ class StockPredictorApp:
         self.ai_scroll_indices[model_name] = new_idx
         
         reason_row = self.ai_reason_rows[model_name]
-        item_height = 12.1
+        item_height = 21.0
         reason_row.top = -new_idx * item_height
         try:
             reason_row.update()
@@ -2104,21 +2104,21 @@ class StockPredictorApp:
                         v_col = ft.Column(
                             controls=[row],
                             scroll=ft.ScrollMode.ALWAYS,
-                            height=122,
+                            height=105,
                             width=285,
                             spacing=0
                         )
                         self.ai_reason_vertical_columns[mdl] = v_col
                     else:
                         v_col.scroll = ft.ScrollMode.ALWAYS
-                        v_col.height = 122
+                        v_col.height = 105
                         if row not in v_col.controls:
                             v_col.controls = [row]
                     container.content = v_col
                 else:
                     row.animate_position = 150
                     current_idx = self.ai_scroll_indices.get(mdl, 0)
-                    row.top = -current_idx * 12.1
+                    row.top = -current_idx * 21.0
                     
                     v_col = self.ai_reason_vertical_columns.get(mdl)
                     if v_col and row in v_col.controls:
