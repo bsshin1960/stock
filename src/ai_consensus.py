@@ -10,6 +10,28 @@ from openai import OpenAI
 from anthropic import Anthropic
 from src.config import DEFAULT_WEIGHTS, BASE_DIR, MACRO_WEIGHTS, BASE_MACRO_WEIGHTS, get_kst_now
 
+def get_ai_recommended_macro_weight(key: str, dt=None) -> float:
+    from src.config import BASE_MACRO_WEIGHTS, get_kst_now
+    if dt is None:
+        dt = get_kst_now()
+    
+    # KST 기준 시간대 판단
+    curr_hour = dt.hour
+    
+    if key in ("Nasdaq_Future", "NASDAQ"):
+        # 오전 7시부터 오전 9시 사이 (7:00 ~ 8:59:59)
+        if 7 <= curr_hour < 9:
+            return 0.50
+        else:
+            return 0.30
+            
+    # 그 외 지표는 BASE_MACRO_WEIGHTS에서 기본값 가져오기
+    # 만약 0.0이거나 존재하지 않으면 0.05 (5%)를 임의의 값으로 부여
+    base_w = abs(BASE_MACRO_WEIGHTS.get(key, 0.0))
+    if base_w == 0.0:
+        return 0.05
+    return base_w
+
 def _get_configured_macro_weights(timestamp: str = None, macro_data: dict = None) -> dict:
     settings_file = BASE_DIR / "settings.json"
     weights = MACRO_WEIGHTS.copy()
@@ -77,6 +99,19 @@ def _get_configured_macro_weights(timestamp: str = None, macro_data: dict = None
         else:
             weights["Nasdaq_Future"] = round(total_nasdaq_w, 4)
             weights["NASDAQ"] = 0.0
+
+    # 수동 설정 가중치 값 중 0.0 인 항목은 실시간/디폴트 AI 추천 가중치로 치환
+    cleaned_manual_w = {}
+    for key, v in manual_w.items():
+        val = float(v)
+        if abs(val) == 0.0:
+            rec_w = get_ai_recommended_macro_weight(key, dt)
+            base_w = BASE_MACRO_WEIGHTS.get(key, 0.0)
+            sign = 1.0 if base_w >= 0 else -1.0
+            cleaned_manual_w[key] = rec_w * sign
+        else:
+            cleaned_manual_w[key] = val
+    manual_w = cleaned_manual_w
 
     # 수동 설정된 가중치의 합 계산
     sum_manual_abs = sum(abs(float(v)) for v in manual_w.values())

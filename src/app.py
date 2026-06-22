@@ -851,9 +851,70 @@ class StockPredictorApp:
         return c
 
 
-    # ─── 시총 TOP10 주가 조회 ───
+    # ─── 시총 TOP10 주가 조회 (폴백 포함) ───
     def _fetch_top10(self):
-        """yfinance로 KOSPI 시총 TOP10 회사 주가를 조회하여 top10_lv에 표시"""
+        """네이버 금융 실시간 API로 KOSPI 시총 TOP10 회사 주가를 조회하여 top10_lv에 표시"""
+        TOP10_CODES = ["005930", "000660", "373220", "207940", "005380", "000270", "006400", "105560", "005490", "055550"]
+        TOP10_NAMES = {
+            "005930": "삼성전자",
+            "000660": "SK하이닉스",
+            "373220": "LG에너지솔루션",
+            "207940": "삼성바이오로직스",
+            "005380": "현대차",
+            "000270": "기아",
+            "006400": "삼성SDI",
+            "105560": "KB금융",
+            "005490": "POSCO홀딩스",
+            "055550": "신한지주"
+        }
+        try:
+            import requests
+            url = f"https://polling.finance.naver.com/api/realtime?query=SERVICE_ITEM:{','.join(TOP10_CODES)}"
+            res = requests.get(url, headers={'User-Agent': 'Mozilla/5.0'}, timeout=5)
+            
+            self.top10_lv.controls.clear()
+            self.top10_scroll_index = 0
+            self.top10_lv.top = 0
+            is_dark = self.page.theme_mode == ft.ThemeMode.DARK
+            text_col = "#E0E6ED" if is_dark else "#0F172A"
+            
+            if res.status_code == 200:
+                data = res.json()
+                datas = data.get("result", {}).get("areas", [{}])[0].get("datas", [])
+                data_map = {item["cd"]: item for item in datas}
+                
+                for code in TOP10_CODES:
+                    name = TOP10_NAMES[code]
+                    item = data_map.get(code, {})
+                    price_val = item.get("nv", 0)
+                    pct = item.get("cr", 0.0)
+                    
+                    pct_str = f"{pct:+.2f}%" if pct is not None else "-%"
+                    pct_color = "#FF1744" if (pct and pct > 0) else "#2979FF" if (pct and pct < 0) else "#8A99AD"
+                    price_str = f"{int(price_val):,}원" if price_val else "-원"
+                    
+                    row = ft.Row([
+                        ft.Text(name, size=11, color=text_col, expand=True),
+                        ft.Text(price_str, size=11, color=text_col),
+                        ft.Text(pct_str, size=11, weight=ft.FontWeight.BOLD, color=pct_color),
+                    ], alignment=ft.MainAxisAlignment.SPACE_BETWEEN)
+                    self.top10_lv.controls.append(row)
+            else:
+                raise ValueError(f"네이버 금융 API 오류 (Status: {res.status_code})")
+                
+            try:
+                self.page.update()
+            except Exception:
+                pass
+            
+            # KODEX 200 1개월 일별 주가 조회 호출
+            self._fetch_kodex200_history()
+        except Exception as ex:
+            self._log(f"TOP10 주가 조회 실패 (네이버 API 폴백 실행): {ex}")
+            self._fetch_top10_fallback()
+
+    def _fetch_top10_fallback(self):
+        """yfinance를 통한 KOSPI 시총 TOP10 주가 조회 폴백 로직"""
         TOP10 = [
             ("삼성전자",     "005930.KS"),
             ("SK하이닉스",   "000660.KS"),
@@ -900,7 +961,7 @@ class StockPredictorApp:
             # KODEX 200 1개월 일별 주가 조회 호출
             self._fetch_kodex200_history()
         except Exception as ex:
-            self._log(f"TOP10 주가 조회 실패: {ex}")
+            self._log(f"TOP10 yfinance 폴백 조회 실패: {ex}")
             self._fetch_kodex200_history()
 
     # ─── KODEX 200 1개월 일별 주가 조회 ───
@@ -1552,8 +1613,9 @@ class StockPredictorApp:
 
             self.status_msg.value = "분석 완료. [파일 > 보고서 저장]에서 보고서를 내보낼 수 있습니다."
             self._log(f"★ 최종: {'상승' if d=='UP' else '하락'} {cp:+.2f}% → 예상 시초가 {tp:,}원")
-            # 차트 최신 데이터 갱신
+            # 차트 및 TOP10/이력 주가 최신 데이터 갱신
             self.page.run_thread(self.load_charts)
+            self.page.run_thread(self._fetch_top10)
 
         except Exception as ex:
             import traceback; traceback.print_exc()
@@ -1950,9 +2012,21 @@ class StockPredictorApp:
                 
                 # 가중치 입력 필드 설정
                 if key in manual_macro_weights:
-                    w_value = f"{abs(manual_macro_weights[key]) * 100:.2f}"
+                    raw_w = float(manual_macro_weights[key])
+                    if abs(raw_w) == 0.0:
+                        from src.ai_consensus import get_ai_recommended_macro_weight
+                        rec_w = get_ai_recommended_macro_weight(key, dt)
+                        w_value = f"{rec_w * 100:.2f}"
+                    else:
+                        w_value = f"{abs(raw_w) * 100:.2f}"
                 else:
-                    w_value = f"{abs(val_w) * 100:.2f}"
+                    val_w_abs = abs(val_w) * 100
+                    if val_w_abs == 0.0:
+                        from src.ai_consensus import get_ai_recommended_macro_weight
+                        rec_w = get_ai_recommended_macro_weight(key, dt)
+                        w_value = f"{rec_w * 100:.2f}"
+                    else:
+                        w_value = f"{val_w_abs:.2f}"
                 
                 macro_pct_fields[key] = ft.TextField(
                     label="변동률 (%)",
@@ -2070,10 +2144,19 @@ class StockPredictorApp:
                         if w_text:
                             try:
                                 w_val_pct = float(w_text)
-                                if abs(w_val_pct - abs(val_w) * 100) > 1e-4:
+                                target_default_w = abs(val_w) * 100
+                                if target_default_w == 0.0:
+                                    from src.ai_consensus import get_ai_recommended_macro_weight
+                                    rec_w = get_ai_recommended_macro_weight(key, dt)
+                                    target_default_w = rec_w * 100
+                                    
+                                if abs(w_val_pct - target_default_w) > 1e-4:
                                     base_w = BASE_MACRO_WEIGHTS.get(key, 0.0)
                                     sign = 1.0 if base_w >= 0 else -1.0
-                                    new_manual_macro_weights[key] = (w_val_pct / 100) * sign
+                                    if w_val_pct == 0.0:
+                                        new_manual_macro_weights[key] = 0.0
+                                    else:
+                                        new_manual_macro_weights[key] = (w_val_pct / 100) * sign
                             except ValueError:
                                 pass
                         
