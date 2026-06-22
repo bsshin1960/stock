@@ -96,6 +96,13 @@ class AIReasonWrapper:
                 
         self.column.width = max_width
         self.viewport.width = max_width
+        if self.app and hasattr(self.app, "ai_reason_detectors") and self.model_name in self.app.ai_reason_detectors:
+            det = self.app.ai_reason_detectors[self.model_name]
+            det.width = max_width
+            try:
+                det.update()
+            except Exception:
+                pass
         
         # 커스텀 스크롤바 높이 및 상태 초기화
         if self.app and hasattr(self.app, "ai_scroll_handles") and self.model_name in self.app.ai_scroll_handles:
@@ -991,11 +998,10 @@ class StockPredictorApp:
             visible=False
         )
         
-        # 2. Stack viewport wrapping the Column & scroll handle
+        # 2. Stack viewport wrapping the Column
         reason_viewport = ft.Stack(
             controls=[
-                reason_lv,
-                ai_handle
+                reason_lv
             ],
             expand=True,
             clip_behavior=ft.ClipBehavior.HARD_EDGE,
@@ -1019,8 +1025,18 @@ class StockPredictorApp:
             spacing=0
         )
         
+        # 5. 최외각 Stack으로 감싸 가로 스크롤과 무관하게 우측 끝에 수직 스크롤바 고정
+        ai_card_scroll_stack = ft.Stack(
+            controls=[
+                reason_horizontal_scroll,
+                ai_handle
+            ],
+            width=285,
+            height=105
+        )
+        
         self.ai_reason_columns[model_name] = reason_lv
-        self.ai_reason_rows[model_name] = reason_horizontal_scroll
+        self.ai_reason_rows[model_name] = ai_card_scroll_stack
         self.ai_reason_viewports[model_name] = reason_viewport
         self.ai_reason_detectors[model_name] = reason_detector
         self.ai_scroll_handles[model_name] = ai_handle
@@ -1032,7 +1048,7 @@ class StockPredictorApp:
             viewport=reason_viewport,
             scroll_indices=self.ai_scroll_indices,
             model_name=model_name,
-            row=reason_horizontal_scroll,
+            row=ai_card_scroll_stack,
             app=self
         )
         
@@ -1067,14 +1083,7 @@ class StockPredictorApp:
         )
         
         # Ensure initial configuration matches scroll mode
-        if self.scroll_mode == "wheel":
-            reason_lv.scroll = ft.ScrollMode.HIDDEN
-            reason_lv.height = 105
-            reason_container_content = reason_horizontal_scroll
-        else:
-            reason_lv.scroll = None
-            reason_lv.height = None
-            reason_container_content = reason_detector
+        reason_container_content = ai_card_scroll_stack
             
         reason_container = ft.Container(
             content=reason_container_content,
