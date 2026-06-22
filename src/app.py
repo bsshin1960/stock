@@ -1029,21 +1029,13 @@ class StockPredictorApp:
             )
         )
         
-        # Ensure initial configuration matches scroll mode
-        if self.scroll_mode == "wheel":
-            reason_horizontal_scroll.top = None
-            reason_horizontal_scroll.animate_position = None
-            reason_horizontal_scroll.height = 105
-            reason_lv.scroll = ft.ScrollMode.HIDDEN
-            reason_lv.height = 105
-            reason_container_content = reason_horizontal_scroll
-        else:
-            reason_horizontal_scroll.top = 0
-            reason_horizontal_scroll.animate_position = 150
-            reason_horizontal_scroll.height = 105
-            reason_lv.scroll = None
-            reason_lv.height = None
-            reason_container_content = reason_detector
+        # Ensure initial configuration matches scroll mode - Unified for both scrollbar and wheel mode
+        reason_horizontal_scroll.top = None
+        reason_horizontal_scroll.animate_position = None
+        reason_horizontal_scroll.height = 105
+        reason_lv.scroll = ft.ScrollMode.HIDDEN
+        reason_lv.height = 105
+        reason_container_content = reason_horizontal_scroll
             
         reason_container = ft.Container(
             content=reason_container_content,
@@ -2072,26 +2064,17 @@ class StockPredictorApp:
             self.kodex_history_lv.height = None
             self.kodex_history_lv.top = -self.kodex_history_scroll_index * 17.0
 
-        # 3. Update AI cards reason containers
+        # 3. Update AI cards reason containers - Unified scroll behavior for both modes
         for mdl in ["Gemini", "ChatGPT", "Claude", "Grok"]:
             if mdl in self.ai_reason_containers:
                 container = self.ai_reason_containers[mdl]
-                detector = self.ai_reason_detectors[mdl]
-                viewport = self.ai_reason_viewports[mdl]
                 row = self.ai_reason_rows[mdl]
                 col = self.ai_reason_columns[mdl]
                 
-                if self.scroll_mode == "wheel":
-                    col.scroll = ft.ScrollMode.HIDDEN
-                    col.height = 105
-                    col.top = None
-                    container.content = row
-                else:
-                    col.scroll = None
-                    col.height = None
-                    current_idx = self.ai_scroll_indices.get(mdl, 0)
-                    col.top = -current_idx * 21.0
-                    container.content = row
+                col.scroll = ft.ScrollMode.HIDDEN
+                col.height = 105
+                col.top = None
+                container.content = row
 
 
         # 4. Trigger UI update
