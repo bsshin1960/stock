@@ -344,7 +344,7 @@ class StockPredictorApp:
         self.top10_scroll_detector = ft.GestureDetector(
             content=self.top10_viewport,
             on_scroll=self.handle_top10_wheel,
-            expand=True
+            height=83
         )
 
         self.top10_box = ft.Container(
@@ -376,7 +376,7 @@ class StockPredictorApp:
         self.kodex_history_scroll_detector = ft.GestureDetector(
             content=self.kodex_history_viewport,
             on_scroll=self.handle_kodex_history_wheel,
-            expand=True
+            height=83
         )
 
         self.dev_box = ft.Container(
@@ -887,7 +887,21 @@ class StockPredictorApp:
                     name = TOP10_NAMES[code]
                     item = data_map.get(code, {})
                     price_val = item.get("nv", 0)
-                    pct = item.get("cr", 0.0)
+                    pcv_val = item.get("pcv", 0)
+                    pct = 0.0
+                    if pcv_val and pcv_val > 0:
+                        pct = ((price_val - pcv_val) / pcv_val) * 100
+                    else:
+                        pct = item.get("cr", 0.0)
+                    
+                    # Naver API fluctuation status check to ensure correct sign
+                    rf = item.get("rf", "")
+                    if rf in ("4", "5"):
+                        pct = -abs(pct)
+                    elif rf in ("1", "2"):
+                        pct = abs(pct)
+                    elif rf == "3":
+                        pct = 0.0
                     
                     pct_str = f"{pct:+.2f}%" if pct is not None else "-%"
                     pct_color = "#FF1744" if (pct and pct > 0) else "#2979FF" if (pct and pct < 0) else "#8A99AD"
@@ -897,7 +911,7 @@ class StockPredictorApp:
                         ft.Text(name, size=11, color=text_col, expand=True),
                         ft.Text(price_str, size=11, color=text_col),
                         ft.Text(pct_str, size=11, weight=ft.FontWeight.BOLD, color=pct_color),
-                    ], alignment=ft.MainAxisAlignment.SPACE_BETWEEN)
+                    ], alignment=ft.MainAxisAlignment.SPACE_BETWEEN, height=15)
                     self.top10_lv.controls.append(row)
             else:
                 raise ValueError(f"네이버 금융 API 오류 (Status: {res.status_code})")
@@ -951,7 +965,7 @@ class StockPredictorApp:
                     ft.Text(name, size=11, color=text_col, expand=True),
                     ft.Text(price_str, size=11, color=text_col),
                     ft.Text(pct_str, size=11, weight=ft.FontWeight.BOLD, color=pct_color),
-                ], alignment=ft.MainAxisAlignment.SPACE_BETWEEN)
+                ], alignment=ft.MainAxisAlignment.SPACE_BETWEEN, height=15)
                 self.top10_lv.controls.append(row)
             try:
                 self.page.update()
@@ -1026,7 +1040,7 @@ class StockPredictorApp:
                             ft.Text(date_str, size=11, color=text_col, expand=True),
                             ft.Text(price_str, size=11, color=text_col),
                             ft.Text(pct_str, size=11, weight=ft.FontWeight.BOLD, color=pct_color),
-                        ], alignment=ft.MainAxisAlignment.SPACE_BETWEEN)
+                        ], alignment=ft.MainAxisAlignment.SPACE_BETWEEN, height=15)
                         self.kodex_history_lv.controls.append(row)
                     
                     try:
@@ -1076,7 +1090,7 @@ class StockPredictorApp:
                         ft.Text(date_str, size=11, color=text_col, expand=True),
                         ft.Text(price_str, size=11, color=text_col),
                         ft.Text(pct_str, size=11, weight=ft.FontWeight.BOLD, color=pct_color),
-                    ], alignment=ft.MainAxisAlignment.SPACE_BETWEEN)
+                    ], alignment=ft.MainAxisAlignment.SPACE_BETWEEN, height=15)
                     self.kodex_history_lv.controls.append(row)
                 try:
                     self.page.update()
@@ -1137,7 +1151,7 @@ class StockPredictorApp:
                         ft.Text(date_str, size=11, color=text_col, expand=True),
                         ft.Text(price_str, size=11, color=text_col),
                         ft.Text(pct_str, size=11, weight=ft.FontWeight.BOLD, color=pct_color),
-                    ], alignment=ft.MainAxisAlignment.SPACE_BETWEEN)
+                    ], alignment=ft.MainAxisAlignment.SPACE_BETWEEN, height=15)
                     self.kodex_history_lv.controls.append(row)
                 try:
                     self.page.update()

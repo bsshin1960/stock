@@ -91,13 +91,48 @@ class DataCollector:
             }
 
     def get_heavyweight_stocks(self) -> dict:
-        """KODEX 200 비중 1, 2위인 삼성전자 및 SK하이닉스의 주가/변동률 수집"""
+        """KODEX 200 비중 1, 2위인 삼성전자 및 SK하이닉스의 주가/변동률 수집 (네이버 금융 실시간 API 적용)"""
         results = {}
         stocks = {
-            "Samsung": TICKER_SAMSUNG,
-            "Hynix": TICKER_HYNIX
+            "Samsung": ("005930", TICKER_SAMSUNG),
+            "Hynix": ("000660", TICKER_HYNIX)
         }
-        for name, ticker_code in stocks.items():
+        
+        # 1. 네이버 금융 실시간 API로 삼성전자, SK하이닉스 조회 시도
+        real_data = {}
+        try:
+            codes = [info[0] for info in stocks.values()]
+            url = f"https://polling.finance.naver.com/api/realtime?query=SERVICE_ITEM:{','.join(codes)}"
+            res = self.session.get(url, timeout=3)
+            if res.status_code == 200:
+                datas = res.json().get("result", {}).get("areas", [{}])[0].get("datas", [])
+                for item in datas:
+                    cd = item.get("cd")
+                    nv = item.get("nv")
+                    cr = item.get("cr", 0.0)
+                    rf = item.get("rf", "")
+                    if nv is not None:
+                        cr_val = float(cr)
+                        if rf in ("4", "5"):
+                            cr_val = -abs(cr_val)
+                        elif rf in ("1", "2"):
+                            cr_val = abs(cr_val)
+                        elif rf == "3":
+                            cr_val = 0.0
+                        real_data[cd] = {
+                            "price": int(nv),
+                            "change_pct": round(cr_val, 2)
+                        }
+        except Exception as e:
+            print(f"[Warning] 대형주 네이버 실시간 API 조회 실패: {e}")
+
+        for name, (code, ticker_code) in stocks.items():
+            # 네이버 실시간 데이터를 우선 채택
+            if code in real_data:
+                results[name] = real_data[code]
+                continue
+                
+            # 실패 시 yfinance 폴백
             try:
                 ticker = yf.Ticker(ticker_code, session=self.session)
                 df = ticker.history(period="5d", timeout=5)
@@ -114,7 +149,7 @@ class DataCollector:
                     "change_pct": round(change_pct, 2)
                 }
             except Exception as e:
-                print(f"[Warning] 대형주 {name} 수집 실패: {e}")
+                print(f"[Warning] 대형주 {name} yfinance 수집 실패: {e}")
                 fallback_vals = {
                     "Samsung": {"price": 75200, "change_pct": 0.27},
                     "Hynix": {"price": 182400, "change_pct": -1.15}
