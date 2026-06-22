@@ -646,7 +646,7 @@ class AIConsensusManager:
         scored_candidates.sort(key=lambda x: x[0], reverse=True)
         
         bullet_points = []
-        for imp, factor, val in scored_candidates[:5]:
+        for imp, factor, val in scored_candidates[:10]:
             # 각 지표에 따른 다이나믹 텍스트 생성
             if factor == "Kospi_Future":
                 txt = f"• [코스피 선물] 야간 코스피 200 선물 지수가 {val:+.2f}% 변동하여 개장 초반 지수 출발 강도 결정"
@@ -729,18 +729,18 @@ class AIConsensusManager:
             target_price = int(parsed.get("target_price", data["kodex200"]["current_price"]))
             reason = parsed.get("reason", "분석이 정상 완료되었습니다.")
             
-            # 5~6개 항목으로 행수 제한 및 보정
+            # 10개 이상 항목 강제 제한 및 보정
             lines = [line.strip() for line in reason.split("\n") if line.strip().startswith("•") or line.strip().startswith("-")]
-            if len(lines) < 5:
+            if len(lines) < 10:
                 mock_pred = self._get_mock_prediction(model_name, data)
                 mock_lines = [l.strip() for l in mock_pred["reason"].split("\n") if l.strip()]
                 for ml in mock_lines:
-                    if len(lines) >= 6:
+                    if len(lines) >= 11:
                         break
                     if ml not in lines:
                         lines.append(ml)
-            elif len(lines) > 6:
-                lines = lines[:6]
+            elif len(lines) > 15:
+                lines = lines[:15]
             reason = "\n".join(lines)
             
             return {

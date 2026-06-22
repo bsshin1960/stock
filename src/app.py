@@ -794,7 +794,7 @@ class StockPredictorApp:
     def _mk_ai_card(self, model_name, display_name, color):
         lp = ft.Text("- %", size=18, weight=ft.FontWeight.BOLD, color="#475569")
         lprice = ft.Text("- 원", size=14, weight=ft.FontWeight.BOLD, color="#0F172A")
-        lr = ft.Text("대기 중...", size=11, color="#475569", no_wrap=True, style=ft.TextStyle(height=1.45))
+        lr = ft.Text("대기 중...", size=11, color="#475569", no_wrap=True, style=ft.TextStyle(height=1.91))
         
         is_dark = self.page.theme_mode == ft.ThemeMode.DARK
         accent_color = "#C084FC" if is_dark else "#7C3AED"
@@ -816,9 +816,11 @@ class StockPredictorApp:
                 ft.Divider(color="#CBD5E1", thickness=1, height=1),
                 price_pct_row,
                 ft.Container(
-                    content=ft.Column([lr], scroll=ft.ScrollMode.AUTO, expand=True),
+                    content=ft.Row([
+                        ft.Column([lr], scroll=ft.ScrollMode.AUTO)
+                    ], scroll=ft.ScrollMode.ALWAYS, vertical_alignment=ft.CrossAxisAlignment.STRETCH, expand=True),
                     expand=True,
-                    margin=ft.Margin(top=5, bottom=8)
+                    margin=ft.Margin(top=5)
                 ),
             ], spacing=0),
             bgcolor="#FFFFFF", padding=12, border_radius=12, border=ft.Border.all(1, "#78909C"), width=309, height=196,
@@ -925,13 +927,13 @@ class StockPredictorApp:
             ("POSCO홀딩스",  "005490.KS"),
             ("신한지주",     "055550.KS"),
         ]
+        is_dark = self.page.theme_mode == ft.ThemeMode.DARK
+        text_col = "#E0E6ED" if is_dark else "#0F172A"
         try:
             import yfinance as yf
             self.top10_lv.controls.clear()
             self.top10_scroll_index = 0
             self.top10_lv.top = 0
-            is_dark = self.page.theme_mode == ft.ThemeMode.DARK
-            text_col = "#E0E6ED" if is_dark else "#0F172A"
             for name, ticker in TOP10:
                 try:
                     t = yf.Ticker(ticker, session=_yf_session)
@@ -955,11 +957,9 @@ class StockPredictorApp:
                 self.page.update()
             except Exception:
                 pass
-            
-            # KODEX 200 1개월 일별 주가 조회 호출
             self._fetch_kodex200_history()
         except Exception as ex:
-            self._log(f"TOP10 yfinance 폴백 조회 실패: {ex}")
+            self._log(f"TOP10 주가 조회 실패: {ex}")
             self._fetch_kodex200_history()
 
     # ─── KODEX 200 1개월 일별 주가 조회 ───

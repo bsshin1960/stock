@@ -23,22 +23,7 @@ class DataCollector:
         })
 
     def get_kodex200_data(self) -> dict:
-        """KODEX 200의 최근 가격 데이터 및 기술적 지표 계산 (실시간 현재가/등락률은 네이버 금융 API 연동)"""
-        # 1. 네이버 금융 실시간 API로 KODEX 200 현재가 및 등락률 조회
-        real_price = None
-        real_pct = None
-        try:
-            url = "https://polling.finance.naver.com/api/realtime?query=SERVICE_ITEM:069500"
-            res = self.session.get(url, timeout=3)
-            if res.status_code == 200:
-                datas = res.json().get("result", {}).get("areas", [{}])[0].get("datas", [])
-                if datas:
-                    item = datas[0]
-                    real_price = int(item.get("nv", 0))
-                    real_pct = float(item.get("cr", 0.0))
-        except Exception as e:
-            print(f"[Warning] KODEX 200 네이버 실시간 API 조회 실패: {e}")
-
+        """KODEX 200의 최근 가격 데이터 및 기술적 지표 계산"""
         try:
             ticker = yf.Ticker(TICKER_KODEX200, session=self.session)
             df = ticker.history(period="6mo", timeout=5)
@@ -74,9 +59,9 @@ class DataCollector:
             latest = df.iloc[-1]
             prev = df.iloc[-2]
 
-            # 네이버 실시간 데이터가 있으면 덮어쓰고, 없으면 yfinance 데이터 사용
-            current_price = real_price if real_price is not None else latest["Close"]
-            change_pct = real_pct if real_pct is not None else (((current_price - prev["Close"]) / prev["Close"]) * 100)
+            current_price = latest["Close"]
+            prev_close = prev["Close"]
+            change_pct = ((current_price - prev_close) / prev_close) * 100
 
             return {
                 "ticker": TICKER_KODEX200,
@@ -98,13 +83,11 @@ class DataCollector:
             }
         except Exception as e:
             print(f"[Error] KODEX 200 데이터 수집 실패: {e}")
-            fallback_price = real_price if real_price is not None else 32540
-            fallback_pct = real_pct if real_pct is not None else -0.45
             return {
-                "ticker": TICKER_KODEX200, "current_price": int(fallback_price), "change_pct": round(fallback_pct, 2),
-                "open": int(fallback_price), "high": int(fallback_price * 1.01), "low": int(fallback_price * 0.99), "volume": 6800000,
-                "sma5": fallback_price, "sma20": fallback_price, "sma60": fallback_price, "rsi14": 54.2,
-                "macd": 120, "macd_signal": 100, "macd_hist": 20, "bb_upper": fallback_price * 1.02, "bb_lower": fallback_price * 0.98
+                "ticker": TICKER_KODEX200, "current_price": 325400, "change_pct": -0.45,
+                "open": 326000, "high": 327500, "low": 324200, "volume": 6800000,
+                "sma5": 324500, "sma20": 323000, "sma60": 321500, "rsi14": 54.2,
+                "macd": 120, "macd_signal": 100, "macd_hist": 20, "bb_upper": 329000, "bb_lower": 318000
             }
 
     def get_heavyweight_stocks(self) -> dict:
