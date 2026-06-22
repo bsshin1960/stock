@@ -1031,16 +1031,10 @@ class StockPredictorApp:
         
         # Ensure initial configuration matches scroll mode
         if self.scroll_mode == "wheel":
-            reason_horizontal_scroll.top = None
-            reason_horizontal_scroll.animate_position = None
-            reason_horizontal_scroll.height = 105
             reason_lv.scroll = ft.ScrollMode.HIDDEN
             reason_lv.height = 105
             reason_container_content = reason_horizontal_scroll
         else:
-            reason_horizontal_scroll.top = 0
-            reason_horizontal_scroll.animate_position = 150
-            reason_horizontal_scroll.height = 105
             reason_lv.scroll = None
             reason_lv.height = None
             reason_container_content = reason_detector
@@ -1450,6 +1444,13 @@ class StockPredictorApp:
             pass
 
     def handle_ai_reason_wheel(self, e: ft.ScrollEvent, model_name: str):
+        import time
+        now = time.time()
+        last_time = self.last_ai_scroll_times.get(model_name, 0.0)
+        if now - last_time < 0.15:
+            return
+        self.last_ai_scroll_times[model_name] = now
+
         direction = 1 if e.scroll_delta.y > 0 else -1
         visible_count = 5
         reason_lv = self.ai_reason_columns[model_name]
