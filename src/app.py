@@ -1456,9 +1456,8 @@ class StockPredictorApp:
         
         col = self.ai_reason_columns[model_name]
         item_height = 21.0
-        col.top = -new_idx * item_height
         try:
-            col.update()
+            col.scroll_to(offset=new_idx * item_height, duration=80)
         except Exception:
             pass
 
