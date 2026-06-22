@@ -40,12 +40,13 @@ def _save_settings(data: dict):
 
 
 class AIReasonWrapper:
-    def __init__(self, column, viewport, scroll_indices, model_name, row=None):
+    def __init__(self, column, viewport, scroll_indices, model_name, row=None, app=None):
         self.column = column
         self.viewport = viewport
         self.scroll_indices = scroll_indices
         self.model_name = model_name
         self.row = row
+        self.app = app
         self._color = "#475569"
         self._value = "대기 중..."
         self.value = "대기 중..."
@@ -75,9 +76,12 @@ class AIReasonWrapper:
         self.column.controls.clear()
         if self.model_name in self.scroll_indices:
             self.scroll_indices[self.model_name] = 0
-        self.column.top = 0
+        self.column.top = None
         if self.row:
-            self.row.top = 0
+            if self.app and self.app.scroll_mode == "wheel":
+                self.row.top = None
+            else:
+                self.row.top = 0
         
         lines = [line for line in text.split("\n") if line.strip()] if text else []
         if not lines:
@@ -100,6 +104,7 @@ class AIReasonWrapper:
             self.viewport.update()
         except Exception:
             pass
+
 
 
 class CustomSwitch(ft.Container):
@@ -988,7 +993,8 @@ class StockPredictorApp:
             viewport=reason_viewport,
             scroll_indices=self.ai_scroll_indices,
             model_name=model_name,
-            row=reason_horizontal_scroll
+            row=reason_horizontal_scroll,
+            app=self
         )
         
         is_dark = self.page.theme_mode == ft.ThemeMode.DARK
