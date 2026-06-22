@@ -790,7 +790,6 @@ class StockPredictorApp:
         # 앱 시작 시 TOP10 주가 비동기 조회
         self.page.run_thread(self._fetch_top10)
 
-    # ─── 카드 헬퍼 ───
     def _mk_ai_card(self, model_name, display_name, color):
         lp = ft.Text("- %", size=18, weight=ft.FontWeight.BOLD, color="#475569")
         lprice = ft.Text("- 원", size=14, weight=ft.FontWeight.BOLD, color="#0F172A")
@@ -807,6 +806,25 @@ class StockPredictorApp:
         )
         
         title_txt = ft.Text(display_name, size=13, weight=ft.FontWeight.BOLD, color="#0F172A")
+        
+        # Local theme for the horizontal scrollbar in AI analysis result box
+        # normal color is full opacity; touched/dragged/hovered color is 30% (alpha 0x4C) opacity
+        normal_scroll_color = "#7E8B9B" if is_dark else "#B0BEC5"
+        touched_scroll_color = "#4C7E8B9B" if is_dark else "#4CB0BEC5"
+        local_scrollbar_theme = ft.Theme(
+            scrollbar_theme=ft.ScrollbarTheme(
+                thumb_color={
+                    ft.ControlState.HOVERED: touched_scroll_color,
+                    ft.ControlState.DRAGGED: touched_scroll_color,
+                    ft.ControlState.PRESSED: touched_scroll_color,
+                    ft.ControlState.DEFAULT: normal_scroll_color,
+                },
+                main_axis_margin=71.25, # 285px * 0.25 = 71.25px left & right margins (reduces length by 50%)
+                thickness=6,
+                radius=3,
+            )
+        )
+        
         c = ft.Container(
             content=ft.Column([
                 ft.Row([
@@ -820,7 +838,8 @@ class StockPredictorApp:
                         ft.Column([lr], scroll=ft.ScrollMode.AUTO)
                     ], scroll=ft.ScrollMode.ALWAYS, vertical_alignment=ft.CrossAxisAlignment.STRETCH, expand=True),
                     expand=True,
-                    margin=ft.Margin(top=5)
+                    margin=ft.Margin(top=5),
+                    theme=local_scrollbar_theme
                 ),
             ], spacing=0),
             bgcolor="#FFFFFF", padding=12, border_radius=12, border=ft.Border.all(1, "#78909C"), width=309, height=196,
