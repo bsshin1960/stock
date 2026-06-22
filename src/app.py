@@ -39,6 +39,65 @@ def _save_settings(data: dict):
         print(f"[Warning] 설정 저장 실패: {e}")
 
 
+class AIReasonWrapper:
+    def __init__(self, column, viewport, scroll_indices, model_name):
+        self.column = column
+        self.viewport = viewport
+        self.scroll_indices = scroll_indices
+        self.model_name = model_name
+        self._color = "#475569"
+        self._value = "대기 중..."
+        self.value = "대기 중..."
+
+    @property
+    def color(self):
+        return self._color
+
+    @color.setter
+    def color(self, val):
+        self._color = val
+        for ctrl in self.column.controls:
+            if isinstance(ctrl, ft.Text):
+                ctrl.color = val
+        try:
+            self.column.update()
+        except Exception:
+            pass
+
+    @property
+    def value(self):
+        return self._value
+
+    @value.setter
+    def value(self, text):
+        self._value = text
+        self.column.controls.clear()
+        if self.model_name in self.scroll_indices:
+            self.scroll_indices[self.model_name] = 0
+        self.column.top = 0
+        
+        lines = [line for line in text.split("\n") if line.strip()] if text else []
+        if not lines:
+            lines = ["대기 중..."]
+            
+        max_width = 285
+        for line in lines:
+            txt = ft.Text(line, size=11, color=self._color, no_wrap=True, style=ft.TextStyle(height=1.91))
+            self.column.controls.append(txt)
+            line_w = len(line) * 7.5 + 20
+            if line_w > max_width:
+                max_width = line_w
+                
+        self.column.width = max_width
+        self.viewport.width = max_width
+        
+        try:
+            self.column.update()
+            self.viewport.update()
+        except Exception:
+            pass
+
+
 class CustomSwitch(ft.Container):
     def __init__(self, value=True, on_change=None):
         self.value = value
@@ -92,6 +151,9 @@ class StockPredictorApp:
         self.kodex_history_scroll_index = 0
         self.allowed_max_top = 550.0
         self.dynamic_max_scroll = 610.0
+        self.ai_reason_columns = {}
+        self.ai_scroll_indices = {}
+        self.last_ai_scroll_times = {}
 
 
         self.data_collector = DataCollector()
@@ -849,7 +911,36 @@ class StockPredictorApp:
     def _mk_ai_card(self, model_name, display_name, color):
         lp = ft.Text("- %", size=18, weight=ft.FontWeight.BOLD, color="#475569")
         lprice = ft.Text("- 원", size=14, weight=ft.FontWeight.BOLD, color="#0F172A")
-        lr = ft.Text("대기 중...", size=11, color="#475569", no_wrap=True, style=ft.TextStyle(height=1.91))
+        
+        reason_lv = ft.Column(
+            spacing=0,
+            top=0,
+            left=0,
+            animate_position=150
+        )
+        
+        reason_viewport = ft.Stack(
+            controls=[reason_lv],
+            expand=True,
+            clip_behavior=ft.ClipBehavior.HARD_EDGE,
+            width=285
+        )
+        
+        reason_detector = ft.GestureDetector(
+            content=reason_viewport,
+            on_scroll=lambda e: self.handle_ai_reason_wheel(e, model_name),
+        )
+        
+        self.ai_reason_columns[model_name] = reason_lv
+        self.ai_scroll_indices[model_name] = 0
+        self.last_ai_scroll_times[model_name] = 0.0
+        
+        lr_wrapper = AIReasonWrapper(
+            column=reason_lv,
+            viewport=reason_viewport,
+            scroll_indices=self.ai_scroll_indices,
+            model_name=model_name
+        )
         
         is_dark = self.page.theme_mode == ft.ThemeMode.DARK
         accent_color = "#C084FC" if is_dark else "#7C3AED"
@@ -890,7 +981,7 @@ class StockPredictorApp:
                 price_pct_row,
                 ft.Container(
                     content=ft.Row([
-                        ft.Column([lr], scroll=ft.ScrollMode.AUTO)
+                        reason_detector
                     ], scroll=ft.ScrollMode.ALWAYS, vertical_alignment=ft.CrossAxisAlignment.STRETCH, expand=True),
                     expand=True,
                     margin=ft.Margin(top=5),
@@ -900,7 +991,7 @@ class StockPredictorApp:
             bgcolor="#FFFFFF", padding=ft.Padding(left=12, right=12, top=12, bottom=2), border_radius=12, border=ft.Border.all(1, "#78909C"), width=309, height=196,
             on_hover=self.handle_body_hover
         )
-        c.data = {"pct": lp, "price": lprice, "reason": lr, "title_txt": title_txt}
+        c.data = {"pct": lp, "price": lprice, "reason": lr_wrapper, "title_txt": title_txt}
         return c
 
     def _mk_macro_card(self, title, subtitle="", is_technical=False, hide_values=False):
@@ -1275,6 +1366,32 @@ class StockPredictorApp:
         self.kodex_history_lv.top = -self.kodex_history_scroll_index * item_height
         try:
             self.kodex_history_lv.update()
+        except Exception:
+            pass
+
+    def handle_ai_reason_wheel(self, e: ft.ScrollEvent, model_name: str):
+        import time
+        now = time.time()
+        if now - self.last_ai_scroll_times.get(model_name, 0.0) < 0.15:
+            return
+        self.last_ai_scroll_times[model_name] = now
+
+        direction = 1 if e.scroll_delta.y > 0 else -1
+        visible_count = 5
+        reason_lv = self.ai_reason_columns[model_name]
+        total_items = len(reason_lv.controls)
+        max_idx = total_items - visible_count
+        if max_idx < 0:
+            max_idx = 0
+            
+        current_idx = self.ai_scroll_indices.get(model_name, 0)
+        new_idx = max(0, min(max_idx, current_idx + direction))
+        self.ai_scroll_indices[model_name] = new_idx
+        
+        item_height = 21.0
+        reason_lv.top = -new_idx * item_height
+        try:
+            reason_lv.update()
         except Exception:
             pass
 
