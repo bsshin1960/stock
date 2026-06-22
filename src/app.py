@@ -841,7 +841,7 @@ class StockPredictorApp:
                     theme=local_scrollbar_theme
                 ),
             ], spacing=0),
-            bgcolor="#FFFFFF", padding=12, border_radius=12, border=ft.Border.all(1, "#78909C"), width=309, height=196,
+            bgcolor="#FFFFFF", padding=ft.Padding(left=12, right=12, top=12, bottom=2), border_radius=12, border=ft.Border.all(1, "#78909C"), width=309, height=196,
             on_hover=self.handle_body_hover
         )
         c.data = {"pct": lp, "price": lprice, "reason": lr, "title_txt": title_txt}
