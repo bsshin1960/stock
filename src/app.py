@@ -2299,12 +2299,25 @@ class StockPredictorApp:
                     ], spacing=10, vertical_alignment=ft.CrossAxisAlignment.CENTER)
                 )
                 
-        form_container = ft.Column(
+        # 화면 크기에 맞춰 다이얼로그 컨테이너 크기 동적 설정
+        page_w = self.page.width if self.page.width is not None else 1340.0
+        page_h = self.page.height if self.page.height is not None else 1030.0
+        
+        dlg_w = min(460.0, page_w - 60.0)
+        dlg_h = min(400.0, page_h - 180.0)
+        
+        v_scroll = ft.Column(
             controls=dialog_content_controls,
             scroll=ft.ScrollMode.AUTO,
-            height=400,
-            width=460,
-            spacing=10
+            spacing=10,
+            width=460
+        )
+        
+        form_container = ft.Row(
+            controls=[v_scroll],
+            scroll=ft.ScrollMode.AUTO,
+            height=dlg_h,
+            width=dlg_w
         )
         
         def on_apply(e):
@@ -2592,12 +2605,25 @@ class StockPredictorApp:
             ], spacing=4)
         ])
         
-        scroll_container = ft.Column(
+        # 화면 크기에 맞춰 다이얼로그 컨테이너 크기 동적 설정
+        page_w = self.page.width if self.page.width is not None else 1340.0
+        page_h = self.page.height if self.page.height is not None else 1030.0
+        
+        dlg_w = min(500.0, page_w - 60.0)
+        dlg_h = min(450.0, page_h - 180.0)
+        
+        v_scroll = ft.Column(
             controls=dialog_content_controls,
             scroll=ft.ScrollMode.AUTO,
-            height=450,
-            width=500,
-            spacing=12
+            spacing=12,
+            width=500
+        )
+        
+        scroll_container = ft.Row(
+            controls=[v_scroll],
+            scroll=ft.ScrollMode.AUTO,
+            height=dlg_h,
+            width=dlg_w
         )
         
         dlg = ft.AlertDialog(
