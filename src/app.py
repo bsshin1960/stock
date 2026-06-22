@@ -1013,16 +1013,17 @@ class StockPredictorApp:
         
         title_txt = ft.Text(display_name, size=13, weight=ft.FontWeight.BOLD, color="#0F172A")
         
-        # Local theme for the horizontal scrollbar in AI analysis result box
-        # both normal and touched (hovered/dragged/pressed) opacity is set to 0.2 (alpha 0x33)
-        scroll_color_02 = "#337E8B9B" if is_dark else "#33B0BEC5"
+        # Local theme for the horizontal and vertical scrollbars in AI analysis result box
+        scroll_color = "#7E8B9B" if is_dark else "#78909C"
+        hover_color = "#C084FC" if is_dark else "#7C3AED"
         local_scrollbar_theme = ft.Theme(
             scrollbar_theme=ft.ScrollbarTheme(
+                thumb_visibility=True,
                 thumb_color={
-                    ft.ControlState.HOVERED: scroll_color_02,
-                    ft.ControlState.DRAGGED: scroll_color_02,
-                    ft.ControlState.PRESSED: scroll_color_02,
-                    ft.ControlState.DEFAULT: scroll_color_02,
+                    ft.ControlState.HOVERED: hover_color,
+                    ft.ControlState.DRAGGED: hover_color,
+                    ft.ControlState.PRESSED: hover_color,
+                    ft.ControlState.DEFAULT: scroll_color,
                 },
                 main_axis_margin=0.0, # Sits at the very left of the box (full span)
                 thickness=6,
