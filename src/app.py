@@ -437,7 +437,7 @@ class StockPredictorApp:
 
         # ===== 시총 TOP10 주가 박스 =====
         self.top10_lv = ft.Column(
-            spacing=2,
+            spacing=0,
             top=0,
             left=4,
             right=4,
@@ -481,7 +481,7 @@ class StockPredictorApp:
 
         # ===== KODEX 200 1개월 일별 주가 박스 (기존 개발중 플레이스홀더 대체) =====
         self.kodex_history_lv = ft.Column(
-            spacing=2,
+            spacing=0,
             top=0,
             left=4,
             right=4,
@@ -1146,7 +1146,7 @@ class StockPredictorApp:
                         ft.Text(name, size=11, color=text_col, expand=True),
                         ft.Text(price_str, size=11, color=text_col),
                         ft.Text(pct_str, size=11, weight=ft.FontWeight.BOLD, color=pct_color),
-                    ], alignment=ft.MainAxisAlignment.SPACE_BETWEEN, height=15)
+                    ], alignment=ft.MainAxisAlignment.SPACE_BETWEEN, height=21)
                     self.top10_lv.controls.append(row)
             else:
                 raise ValueError(f"네이버 금융 API 오류 (Status: {res.status_code})")
@@ -1200,7 +1200,7 @@ class StockPredictorApp:
                     ft.Text(name, size=11, color=text_col, expand=True),
                     ft.Text(price_str, size=11, color=text_col),
                     ft.Text(pct_str, size=11, weight=ft.FontWeight.BOLD, color=pct_color),
-                ], alignment=ft.MainAxisAlignment.SPACE_BETWEEN, height=15)
+                ], alignment=ft.MainAxisAlignment.SPACE_BETWEEN, height=21)
                 self.top10_lv.controls.append(row)
             try:
                 self.page.update()
@@ -1275,7 +1275,7 @@ class StockPredictorApp:
                             ft.Text(date_str, size=11, color=text_col, expand=True),
                             ft.Text(price_str, size=11, color=text_col),
                             ft.Text(pct_str, size=11, weight=ft.FontWeight.BOLD, color=pct_color),
-                        ], alignment=ft.MainAxisAlignment.SPACE_BETWEEN, height=15)
+                        ], alignment=ft.MainAxisAlignment.SPACE_BETWEEN, height=21)
                         self.kodex_history_lv.controls.append(row)
                     
                     try:
@@ -1325,7 +1325,7 @@ class StockPredictorApp:
                         ft.Text(date_str, size=11, color=text_col, expand=True),
                         ft.Text(price_str, size=11, color=text_col),
                         ft.Text(pct_str, size=11, weight=ft.FontWeight.BOLD, color=pct_color),
-                    ], alignment=ft.MainAxisAlignment.SPACE_BETWEEN, height=15)
+                    ], alignment=ft.MainAxisAlignment.SPACE_BETWEEN, height=21)
                     self.kodex_history_lv.controls.append(row)
                 try:
                     self.page.update()
@@ -1386,7 +1386,7 @@ class StockPredictorApp:
                         ft.Text(date_str, size=11, color=text_col, expand=True),
                         ft.Text(price_str, size=11, color=text_col),
                         ft.Text(pct_str, size=11, weight=ft.FontWeight.BOLD, color=pct_color),
-                    ], alignment=ft.MainAxisAlignment.SPACE_BETWEEN, height=15)
+                    ], alignment=ft.MainAxisAlignment.SPACE_BETWEEN, height=21)
                     self.kodex_history_lv.controls.append(row)
                 try:
                     self.page.update()
@@ -1412,7 +1412,7 @@ class StockPredictorApp:
             max_idx = 0
             
         self.top10_scroll_index = max(0, min(max_idx, self.top10_scroll_index + direction))
-        item_height = 17.0
+        item_height = 21.0
         self.top10_lv.top = -self.top10_scroll_index * item_height
         try:
             self.top10_lv.update()
@@ -1436,7 +1436,7 @@ class StockPredictorApp:
             max_idx = 0
             
         self.kodex_history_scroll_index = max(0, min(max_idx, self.kodex_history_scroll_index + direction))
-        item_height = 17.0
+        item_height = 21.0
         self.kodex_history_lv.top = -self.kodex_history_scroll_index * item_height
         try:
             self.kodex_history_lv.update()
@@ -2061,7 +2061,7 @@ class StockPredictorApp:
         else:
             self.top10_lv.scroll = None
             self.top10_lv.height = None
-            self.top10_lv.top = -self.top10_scroll_index * 17.0
+            self.top10_lv.top = -self.top10_scroll_index * 21.0
 
         # 2. Update Kodex History
         if self.scroll_mode == "wheel":
@@ -2071,7 +2071,7 @@ class StockPredictorApp:
         else:
             self.kodex_history_lv.scroll = None
             self.kodex_history_lv.height = None
-            self.kodex_history_lv.top = -self.kodex_history_scroll_index * 17.0
+            self.kodex_history_lv.top = -self.kodex_history_scroll_index * 21.0
 
         # 3. Update AI cards reason containers
         for mdl in ["Gemini", "ChatGPT", "Claude", "Grok"]:

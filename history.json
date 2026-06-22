@@ -22488,5 +22488,122 @@
     "after_consensus_weights": null,
     "after_macro_weights": null,
     "after_ai_weights": null
+  },
+  {
+    "date": "2026-06-22 16:50:58",
+    "current_price": 148355,
+    "predicted_direction": "UP",
+    "target_price": 149126,
+    "predicted_change_pct": 0.52,
+    "actual_open": null,
+    "actual_direction": null,
+    "result": "대기 중",
+    "ai_predictions": {
+      "Gemini": {
+        "predicted_direction": "UP",
+        "target_price": 149556,
+        "predicted_change_pct": 0.81,
+        "actual_open": null,
+        "actual_direction": null,
+        "result": "대기 중"
+      },
+      "ChatGPT": {
+        "predicted_direction": "DOWN",
+        "target_price": 148147,
+        "predicted_change_pct": -0.14,
+        "actual_open": null,
+        "actual_direction": null,
+        "result": "대기 중"
+      },
+      "Claude": {
+        "predicted_direction": "UP",
+        "target_price": 148918,
+        "predicted_change_pct": 0.38,
+        "actual_open": null,
+        "actual_direction": null,
+        "result": "대기 중"
+      },
+      "Grok": {
+        "predicted_direction": "UP",
+        "target_price": 148503,
+        "predicted_change_pct": 0.1,
+        "actual_open": null,
+        "actual_direction": null,
+        "result": "대기 중"
+      }
+    },
+    "components": {
+      "AI_Consensus": 0.292307,
+      "Macro_Dashboard": 0.9284643071385726,
+      "News_Consensus": 0.5,
+      "Rumor_Consensus": 0.5
+    },
+    "macro_data": {
+      "Kospi_Future": 1.22,
+      "Nasdaq_Future": 0.14,
+      "USD_KRW": 0.18,
+      "USD_JPY": 0.27,
+      "Gold_Future": -0.27,
+      "US10Y_Treasury": -0.27,
+      "WTI_Crude": -1.23,
+      "VIX_Index": 6.34,
+      "SOX_Index": 6.42,
+      "Dollar_Index": 0.12,
+      "Nikkei_225": 1.55,
+      "MSCI_Korea": 6.89,
+      "Bitcoin": 1.47,
+      "NASDAQ": 1.91,
+      "US_CPI": 0.47,
+      "US_Rate": -0.27,
+      "KR_Rate": 0.0,
+      "KR_Bond": 0.79,
+      "Technical_Analysis1": 2.48,
+      "Technical_Analysis2": 0.5,
+      "Short_Selling": 2.02,
+      "Famous_Remarks": -2.43,
+      "Kodex200": 0.98,
+      "Fear_Greed_Index": 0.0
+    },
+    "before_consensus_weights": {
+      "AI_Consensus": 0.5423,
+      "Macro_Dashboard": 0.3085,
+      "News_Consensus": 0.1331,
+      "Rumor_Consensus": 0.016200000000000003
+    },
+    "before_macro_weights": {
+      "Kospi_Future": 0.0073,
+      "Nasdaq_Future": 0.3,
+      "Fear_Greed_Index": 0.0001,
+      "VIX_Index": -0.2541,
+      "USD_KRW": -0.0004,
+      "USD_JPY": -0.0002,
+      "SOX_Index": 0.2334,
+      "MSCI_Korea": 0.1215,
+      "Kodex200": 0.0084,
+      "US10Y_Treasury": -0.0002,
+      "WTI_Crude": -0.0049,
+      "KR_Rate": -0.0,
+      "KR_Bond": -0.0021,
+      "Dollar_Index": -0.0003,
+      "Gold_Future": 0.003,
+      "US_CPI": 0.0,
+      "Technical_Analysis1": 0.0567,
+      "Technical_Analysis2": 0.0018,
+      "Nikkei_225": 0.0004,
+      "Short_Selling": -0.0019,
+      "Famous_Remarks": 0.0005,
+      "Bitcoin": 0.003,
+      "US_Rate": 0.0,
+      "NASDAQ": 0.0
+    },
+    "before_ai_weights": {
+      "Gemini": 0.2753,
+      "ChatGPT": 0.2753,
+      "Claude": 0.22469999999999998,
+      "Grok": 0.22469999999999998
+    },
+    "after_consensus_weights": null,
+    "after_macro_weights": null,
+    "after_ai_weights": null
   }
 ]
