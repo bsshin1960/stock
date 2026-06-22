@@ -80,7 +80,7 @@ class AIReasonWrapper:
         if self.row:
             if self.app and self.app.scroll_mode == "wheel":
                 self.row.top = None
-                self.row.height = None
+                self.row.height = 105
             else:
                 self.row.top = 0
                 self.row.height = 105
@@ -1035,20 +1035,16 @@ class StockPredictorApp:
         if self.scroll_mode == "wheel":
             reason_horizontal_scroll.top = None
             reason_horizontal_scroll.animate_position = None
-            reason_horizontal_scroll.height = None
-            v_col = ft.Column(
-                controls=[reason_horizontal_scroll],
-                scroll=ft.ScrollMode.ALWAYS,
-                height=105,
-                width=285,
-                spacing=0
-            )
-            self.ai_reason_vertical_columns[model_name] = v_col
-            reason_container_content = v_col
+            reason_horizontal_scroll.height = 105
+            reason_lv.scroll = ft.ScrollMode.ALWAYS
+            reason_lv.height = 105
+            reason_container_content = reason_horizontal_scroll
         else:
             reason_horizontal_scroll.top = 0
             reason_horizontal_scroll.animate_position = 150
             reason_horizontal_scroll.height = 105
+            reason_lv.scroll = None
+            reason_lv.height = None
             reason_container_content = reason_detector
             
         reason_container = ft.Container(
@@ -2098,32 +2094,21 @@ class StockPredictorApp:
                 if self.scroll_mode == "wheel":
                     row.top = None
                     row.animate_position = None
-                    row.height = None
+                    row.height = 105
+                    col.scroll = ft.ScrollMode.ALWAYS
+                    col.height = 105
                     
                     if row in viewport.controls:
                         viewport.controls.remove(row)
                         
-                    v_col = self.ai_reason_vertical_columns.get(mdl)
-                    if not v_col:
-                        v_col = ft.Column(
-                            controls=[row],
-                            scroll=ft.ScrollMode.ALWAYS,
-                            height=105,
-                            width=285,
-                            spacing=0
-                        )
-                        self.ai_reason_vertical_columns[mdl] = v_col
-                    else:
-                        v_col.scroll = ft.ScrollMode.ALWAYS
-                        v_col.height = 105
-                        if row not in v_col.controls:
-                            v_col.controls = [row]
-                    container.content = v_col
+                    container.content = row
                 else:
                     row.animate_position = 150
                     row.height = 105
                     current_idx = self.ai_scroll_indices.get(mdl, 0)
                     row.top = -current_idx * 21.0
+                    col.scroll = None
+                    col.height = None
                     
                     v_col = self.ai_reason_vertical_columns.get(mdl)
                     if v_col and row in v_col.controls:
