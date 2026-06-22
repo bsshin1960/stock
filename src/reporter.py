@@ -111,7 +111,7 @@ class PredictionReporter:
         | **기술적분석1 (Kodex200 주간주가분석)** | `-` | `-` | 분석 보조 요인 |
         | **기술적분석2 (Kodex200 MA,MACD,RSI)** | `-` | `-` | 분석 보조 요인 |
         | **일본 닛케이 225** | `{m['Nikkei_225']['value']:,}` | `{m['Nikkei_225']['change_pct']}%` | 아시아 증시 영향 |
-        | **상해 종합지수** | `{m['Shanghai_Composite']['value']:,}` | `{m['Shanghai_Composite']['change_pct']}%` | 중국 경기 영향 |
+        | **공포·탐욕 지수** | `{m['Fear_Greed_Index']['value']:,}` | `{m['Fear_Greed_Index']['change_pct']}%` | 투자 심리 지표 |
         | **MSCI 한국 ETF 종가** | `{m['MSCI_Korea']['value']:,}` | `{m['MSCI_Korea']['change_pct']}%` | 한국 증시 선행 |
         | **상위종목공매도** | `{m['Short_Selling']['value']:,}` | `{m['Short_Selling']['change_pct']}%` | 시장 수급 요인 |
         | **유명인사 발언** | `{m['Famous_Remarks']['value']:,}` | `{m['Famous_Remarks']['change_pct']}%` | 투자 심리 영향 |

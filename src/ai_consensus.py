@@ -13,20 +13,23 @@ from src.config import DEFAULT_WEIGHTS, BASE_DIR, MACRO_WEIGHTS, BASE_MACRO_WEIG
 def _get_configured_macro_weights(timestamp: str = None, macro_data: dict = None) -> dict:
     settings_file = BASE_DIR / "settings.json"
     weights = MACRO_WEIGHTS.copy()
+    manual_w = {}
+    
     if settings_file.exists():
         try:
             with open(settings_file, "r", encoding="utf-8") as f:
                 saved = json.load(f)
                 custom_weights = saved.get("macro_weights")
                 if custom_weights:
-                    # 현재 유효한 키만 필터링 (구버전 키 제거)
                     valid_keys = set(MACRO_WEIGHTS.keys())
                     filtered = {k: float(v) for k, v in custom_weights.items() if k in valid_keys}
-                    # 새 키에 대해 기본값 추가
                     for k, v in MACRO_WEIGHTS.items():
                         if k not in filtered:
                             filtered[k] = v
                     weights = filtered
+                
+                # 수동 가중치 설정 가져오기
+                manual_w = saved.get("manual_macro_weights", {})
         except Exception:
             pass
 
@@ -55,49 +58,96 @@ def _get_configured_macro_weights(timestamp: str = None, macro_data: dict = None
     is_dst = (dst_start <= dt < dst_end)
     
     open_hour, open_minute = (22, 30) if is_dst else (23, 30)
+    close_hour = 5 if is_dst else 6
     curr_time = dt.time()
     open_time = datetime.time(open_hour, open_minute)
-    morning_limit = datetime.time(9, 0)
+    close_time = datetime.time(close_hour, 0)
     
-    is_active = (curr_time >= open_time or curr_time < morning_limit)
-
-    total_nasdaq_w = weights.get("Nasdaq_Future", 0.15) + weights.get("NASDAQ", 0.0)
-    if is_active:
-        weights["NASDAQ"] = round(total_nasdaq_w, 4)
-        weights["Nasdaq_Future"] = 0.0
+    if open_time <= curr_time or curr_time < close_time:
+        is_us_open = True
     else:
-        weights["Nasdaq_Future"] = round(total_nasdaq_w, 4)
-        weights["NASDAQ"] = 0.0
+        is_us_open = False
 
-    # 변동율 크기에 따른 가중치 동적 스케일링 및 정규화
+    # 나스닥 주가/선물 스왑 (수동 가중치가 지정되지 않은 경우에만 자동 스왑)
+    if "NASDAQ" not in manual_w and "Nasdaq_Future" not in manual_w:
+        total_nasdaq_w = weights.get("Nasdaq_Future", 0.30) + weights.get("NASDAQ", 0.0)
+        if is_us_open:
+            weights["NASDAQ"] = round(total_nasdaq_w, 4)
+            weights["Nasdaq_Future"] = 0.0
+        else:
+            weights["Nasdaq_Future"] = round(total_nasdaq_w, 4)
+            weights["NASDAQ"] = 0.0
+
+    # 수동 설정된 가중치의 합 계산
+    sum_manual_abs = sum(abs(float(v)) for v in manual_w.values())
+    
     scaled_weights = {}
-    sum_abs = 0.0
+    sum_auto_scaled_abs = 0.0
+    
     for key, w in weights.items():
-        if w == 0.0:
-            scaled_weights[key] = 0.0
-            continue
-            
-        change_pct = 0.0
-        if macro_data:
-            val = macro_data.get(key)
-            if isinstance(val, dict):
-                change_pct = val.get("change_pct", 0.0)
-            elif isinstance(val, (int, float)):
-                change_pct = val
+        if key in manual_w:
+            # 수동 지표는 스케일링 없이 입력된 가중치 유지
+            scaled_weights[key] = float(manual_w[key])
+        else:
+            # 자동 지표: 동적 스케일링 적용
+            if w == 0.0:
+                scaled_weights[key] = 0.0
+                continue
                 
-        # 스케일 공식: w * (1.0 + alpha * abs(change_pct))
-        alpha = 1.0
-        scale = 1.0 + alpha * abs(change_pct)
-        w_new = w * scale
-        scaled_weights[key] = w_new
-        sum_abs += abs(w_new)
-        
-    if sum_abs > 0.0:
-        for key in scaled_weights:
-            scaled_weights[key] = round(scaled_weights[key] / sum_abs, 4)
-        return scaled_weights
+            change_pct = 0.0
+            if macro_data:
+                val = macro_data.get(key)
+                if isinstance(val, dict):
+                    change_pct = val.get("change_pct", 0.0)
+                elif isinstance(val, (int, float)):
+                    change_pct = val
+                    
+            alpha = 1.0
+            scale = 1.0 + alpha * abs(change_pct)
+            w_new = w * scale
+            scaled_weights[key] = w_new
+            sum_auto_scaled_abs += abs(w_new)
 
-    return weights
+    # 최종 정규화
+    if sum_manual_abs >= 1.0:
+        # 수동 가중치만으로 100% 이상인 경우 자동 가중치는 모두 0% 처리
+        for key in scaled_weights:
+            if key in manual_w:
+                scaled_weights[key] = round(scaled_weights[key] / sum_manual_abs, 4)
+            else:
+                scaled_weights[key] = 0.0
+    else:
+        # 수동 가중치 제외한 남는 비율 계산 (남은 비율 = 100% - 수동 가중치 합)
+        remaining_capacity = 1.0 - sum_manual_abs
+        
+        if sum_auto_scaled_abs > 0.0:
+            for key in scaled_weights:
+                if key not in manual_w:
+                    scaled_weights[key] = round((scaled_weights[key] / sum_auto_scaled_abs) * remaining_capacity, 4)
+                else:
+                    scaled_weights[key] = round(scaled_weights[key], 4)
+        else:
+            # 스케일 합이 0인 경우 BASE_MACRO_WEIGHTS 복원
+            fallback_sum = 0.0
+            for key in scaled_weights:
+                if key not in manual_w:
+                    scaled_weights[key] = BASE_MACRO_WEIGHTS.get(key, 0.0)
+                    fallback_sum += abs(scaled_weights[key])
+            
+            if fallback_sum > 0.0:
+                for key in scaled_weights:
+                    if key not in manual_w:
+                        scaled_weights[key] = round((scaled_weights[key] / fallback_sum) * remaining_capacity, 4)
+                    else:
+                        scaled_weights[key] = round(scaled_weights[key], 4)
+            else:
+                for key in scaled_weights:
+                    if key not in manual_w:
+                        scaled_weights[key] = 0.0
+                    else:
+                        scaled_weights[key] = round(scaled_weights[key], 4)
+
+    return scaled_weights
 
 def _get_configured_consensus_weights() -> dict:
     settings_file = BASE_DIR / "settings.json"
@@ -404,7 +454,7 @@ class AIConsensusManager:
    - 필라델피아 반도체 지수: {m['SOX_Index']['value']:,} ({m['SOX_Index']['change_pct']}%)
    - US 달러 인덱스: {m['Dollar_Index']['value']:,} ({m['Dollar_Index']['change_pct']}%)
    - 일본 닛케이 225 지수: {m['Nikkei_225']['value']:,} ({m['Nikkei_225']['change_pct']}%)
-   - 상해 종합 지수: {m['Shanghai_Composite']['value']:,} ({m['Shanghai_Composite']['change_pct']}%)
+   - 공포·탐욕 지수: {m['Fear_Greed_Index']['value']:,} ({m['Fear_Greed_Index']['change_pct']}%)
    - MSCI 한국 ETF 종가: {m['MSCI_Korea']['value']:,} ({m['MSCI_Korea']['change_pct']}%)
    - 상위종목공매도 (KODEX200): {m['Short_Selling']['value']:,} ({m['Short_Selling']['change_pct']}%)
    - 유명인사 발언 (연준의장/트럼프/이재명 등): {m['Famous_Remarks']['value']:,} ({m['Famous_Remarks']['change_pct']}%)
@@ -532,7 +582,7 @@ class AIConsensusManager:
         model_candidates = {
             "Gemini": ["Kospi_Future", "Samsung", "Hynix", "Technical_Analysis1", "Technical_Analysis2", "SOX_Index", "MSCI_Korea", "USD_KRW", "VIX_Index", "NASDAQ", "US10Y_Treasury", "Short_Selling"],
             "ChatGPT": ["Kospi_Future", "Nasdaq_Future", "Kodex200", "VIX_Index", "Technical_Analysis2", "SOX_Index", "NASDAQ", "USD_KRW", "Bitcoin", "Gold_Future", "US_CPI", "US_Rate"],
-            "Claude": ["US_CPI", "USD_KRW", "USD_JPY", "US10Y_Treasury", "Samsung", "KR_Rate", "KR_Bond", "US_Rate", "SOX_Index", "Famous_Remarks", "Nikkei_225", "Shanghai_Composite"],
+            "Claude": ["US_CPI", "USD_KRW", "USD_JPY", "US10Y_Treasury", "Samsung", "KR_Rate", "KR_Bond", "US_Rate", "SOX_Index", "Famous_Remarks", "Nikkei_225", "Fear_Greed_Index"],
             "Grok": ["VIX_Index", "WTI_Crude", "Kospi_Future", "USD_KRW", "Bitcoin", "Technical_Analysis1", "Famous_Remarks", "Nasdaq_Future", "NASDAQ", "Gold_Future", "Dollar_Index", "MSCI_Korea"]
         }
         
@@ -966,7 +1016,7 @@ if __name__ == "__main__":
             "Technical_Analysis1": {"value": 0.0, "change_pct": 0.0},
             "Technical_Analysis2": {"value": 0.0, "change_pct": 0.0},
             "Nikkei_225": {"value": 38720.50, "change_pct": -0.42},
-            "Shanghai_Composite": {"value": 3110.25, "change_pct": 0.15},
+            "Fear_Greed_Index": {"value": 50.0, "change_pct": 0.0},
             "MSCI_Korea": {"value": 62.45, "change_pct": 0.42},
             "Short_Selling": {"value": 1452.40, "change_pct": -0.85},
             "Famous_Remarks": {"value": 52.34, "change_pct": 0.45},

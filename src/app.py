@@ -278,6 +278,26 @@ class StockPredictorApp:
 
         self.consensus_title_icon = ft.Icon(ft.Icons.ANALYTICS_ROUNDED, size=16, color="#C084FC")
         self.consensus_title_text = ft.Text("최종 종합 예측 결과", size=13, color="#C084FC", weight=ft.FontWeight.BOLD)
+        self.manual_input_btn = ft.OutlinedButton(
+            content=ft.Text("수동입력", size=11, weight=ft.FontWeight.BOLD, color="#C084FC"),
+            style=ft.ButtonStyle(
+                side={"": ft.BorderSide(1, "#C084FC")},
+                shape=ft.RoundedRectangleBorder(radius=4),
+                padding=ft.Padding(left=6, right=6, top=0, bottom=0),
+            ),
+            height=20,
+            on_click=self.show_manual_input_dialog,
+        )
+        self.calc_basis_btn = ft.OutlinedButton(
+            content=ft.Text("산출근거", size=11, weight=ft.FontWeight.BOLD, color="#C084FC"),
+            style=ft.ButtonStyle(
+                side={"": ft.BorderSide(1, "#C084FC")},
+                shape=ft.RoundedRectangleBorder(radius=4),
+                padding=ft.Padding(left=6, right=6, top=0, bottom=0),
+            ),
+            height=20,
+            on_click=self.show_calculation_basis_dialog,
+        )
         self.weights_label = ft.Text(size=10, color="#8A99AD", italic=True)
         self.update_weights_label()
 
@@ -290,6 +310,7 @@ class StockPredictorApp:
                     ft.Row([
                         self.consensus_title_icon,
                         self.consensus_title_text,
+                        self.calc_basis_btn,
                     ], spacing=6),
                     self.weights_label,
                 ], alignment=ft.MainAxisAlignment.SPACE_BETWEEN),
@@ -456,7 +477,7 @@ class StockPredictorApp:
             ("Technical_Analysis1", "Technical_Analysis1"),
             ("Technical_Analysis2", "Technical_Analysis2"),
             ("Nikkei_225", "Nikkei_225"),
-            ("Shanghai_Composite", "Shanghai_Composite"),
+            ("Fear_Greed_Index", "Fear_Greed_Index"),
             ("MSCI_Korea", "MSCI_Korea"),
             ("Short_Selling", "Short_Selling"),
             ("Famous_Remarks", "Famous_Remarks"),
@@ -609,7 +630,10 @@ class StockPredictorApp:
         # ===== 페이지 조립 =====
         body = ft.Column([
             ft.Row([
-                ft.Column([self.title_row, self.subtitle_label], spacing=10, expand=True),
+                ft.Column([
+                    self.title_row,
+                    ft.Row([self.subtitle_label, self.manual_input_btn], spacing=10, vertical_alignment=ft.CrossAxisAlignment.CENTER)
+                ], spacing=10, expand=True),
                 theme_and_run_col
             ], alignment=ft.MainAxisAlignment.SPACE_BETWEEN, width=1274),
             ft.Divider(color="#2E3A4E", thickness=1, height=1),
@@ -1399,6 +1423,7 @@ class StockPredictorApp:
             # 1. 데이터 수집
             self._log("대형주, 한일 선물지수, 환율 및 공포지수 크롤링 중...")
             self.current_data = self.data_collector.collect_all()
+            self._apply_manual_overrides_to_current_data()
             k = self.current_data["kodex200"]
             hw = self.current_data["heavyweights"]
             m = self.current_data["macro"]
@@ -1427,7 +1452,7 @@ class StockPredictorApp:
                 "Technical_Analysis1": lambda v: "",
                 "Technical_Analysis2": lambda v: "",
                 "Nikkei_225": lambda v: f"{v:,.2f}",
-                "Shanghai_Composite": lambda v: f"{v:,.2f}",
+                "Fear_Greed_Index": lambda v: f"{v:,.2f}",
                 "MSCI_Korea": lambda v: f"{v:,.2f}",
                 "Short_Selling": lambda v: f"{v:,.2f}",
                 "Famous_Remarks": lambda v: f"{v:,.2f}",
@@ -1683,6 +1708,613 @@ class StockPredictorApp:
         except Exception as e:
             print(f"[Warning] Failed to update macro card titles: {e}")
 
+    # ─── 수동 입력 및 산출 근거 팝업 구현 ───
+    def _apply_manual_overrides_to_current_data(self):
+        if not self.current_data or "macro" not in self.current_data:
+            return
+        settings = _load_settings()
+        manual_pcts = settings.get("manual_macro_pcts", {})
+        for key, info in self.current_data["macro"].items():
+            if "original_change_pct" not in info:
+                info["original_change_pct"] = info.get("change_pct", 0.0)
+            
+            if key in manual_pcts and manual_pcts[key] is not None:
+                info["change_pct"] = float(manual_pcts[key])
+            else:
+                info["change_pct"] = info["original_change_pct"]
+
+    def _ensure_current_data_exists(self):
+        if self.current_data is None:
+            self.current_data = {
+                "timestamp": get_kst_now().strftime("%Y-%m-%d %H:%M:%S"),
+                "kodex200": {
+                    "current_price": 32540,
+                    "change_pct": 0.0,
+                    "sma5": 32450, "sma20": 32300, "sma60": 32150,
+                    "rsi14": 50.0, "macd": 0, "macd_signal": 0, "macd_hist": 0,
+                    "bb_upper": 33000, "bb_lower": 32000
+                },
+                "heavyweights": {
+                    "Samsung": {"price": 75000, "change_pct": 0.0},
+                    "Hynix": {"price": 180000, "change_pct": 0.0}
+                },
+                "macro": {
+                    "Kospi_Future": {"value": 320.0, "change_pct": 0.0},
+                    "Nasdaq_Future": {"value": 18000.0, "change_pct": 0.0},
+                    "Kodex200": {"value": 32540.0, "change_pct": 0.0},
+                    "USD_KRW": {"value": 1350.0, "change_pct": 0.0},
+                    "USD_JPY": {"value": 155.0, "change_pct": 0.0},
+                    "Gold_Future": {"value": 2300.0, "change_pct": 0.0},
+                    "US10Y_Treasury": {"value": 4.4, "change_pct": 0.0},
+                    "WTI_Crude": {"value": 80.0, "change_pct": 0.0},
+                    "VIX_Index": {"value": 15.0, "change_pct": 0.0},
+                    "KR_Rate": {"value": 3.50, "change_pct": 0.0},
+                    "KR_Bond": {"value": 3.20, "change_pct": 0.0},
+                    "SOX_Index": {"value": 4800.0, "change_pct": 0.0},
+                    "Dollar_Index": {"value": 104.0, "change_pct": 0.0},
+                    "US_CPI": {"value": 310.0, "change_pct": 0.0},
+                    "Technical_Analysis1": {"value": 0.0, "change_pct": 0.0},
+                    "Technical_Analysis2": {"value": 0.0, "change_pct": 0.0},
+                    "Nikkei_225": {"value": 38000.0, "change_pct": 0.0},
+                    "Fear_Greed_Index": {"value": 50.0, "change_pct": 0.0},
+                    "MSCI_Korea": {"value": 60.0, "change_pct": 0.0},
+                    "Short_Selling": {"value": 1000.0, "change_pct": 0.0},
+                    "Famous_Remarks": {"value": 50.0, "change_pct": 0.0},
+                    "Bitcoin": {"value": 65000.0, "change_pct": 0.0},
+                    "US_Rate": {"value": 5.25, "change_pct": 0.0},
+                    "NASDAQ": {"value": 16000.0, "change_pct": 0.0}
+                },
+                "news": ["수동 입력 모드 활성화됨"],
+                "rumors": ["수동 입력 모드 활성화됨"]
+            }
+        self._apply_manual_overrides_to_current_data()
+        if self.ai_results is None:
+            self.ai_results = {
+                "Gemini": {"change_pct": 0.0, "target_price": 32540, "reason": "수동 입력 기본값"},
+                "ChatGPT": {"change_pct": 0.0, "target_price": 32540, "reason": "수동 입력 기본값"},
+                "Claude": {"change_pct": 0.0, "target_price": 32540, "reason": "수동 입력 기본값"},
+                "Grok": {"change_pct": 0.0, "target_price": 32540, "reason": "수동 입력 기본값"},
+            }
+
+    def show_manual_input_dialog(self, e):
+        self._ensure_current_data_exists()
+        
+        is_dark = self.page.theme_mode == ft.ThemeMode.DARK
+        accent_color = "#C084FC" if is_dark else "#7C3AED"
+        border_card = "#2E3A4E" if is_dark else "#78909C"
+        bg_card = "#1A2333" if is_dark else "#FFFFFF"
+        text_color = "#E0E6ED" if is_dark else "#000000"
+        
+        k = self.current_data["kodex200"]
+        ai_res = self.ai_results
+        macro_data = self.current_data["macro"]
+        
+        # Load weights
+        from src.ai_consensus import _get_configured_ai_weights, _get_configured_consensus_weights
+        from src.config import MACRO_WEIGHTS, MACRO_LABELS, BASE_DIR
+        import json
+        
+        ai_w = _get_configured_ai_weights()
+        con_w = _get_configured_consensus_weights()
+        
+        # Load baseline macro weights and manual overrides
+        settings_file = BASE_DIR / "settings.json"
+        macro_w = MACRO_WEIGHTS.copy()
+        manual_macro_pcts = {}
+        manual_macro_weights = {}
+        if settings_file.exists():
+            try:
+                with open(settings_file, "r", encoding="utf-8") as f:
+                    saved = json.load(f)
+                    custom_weights = saved.get("macro_weights")
+                    if custom_weights:
+                        valid_keys = set(MACRO_WEIGHTS.keys())
+                        for key_w, val_w in custom_weights.items():
+                            if key_w in valid_keys:
+                                macro_w[key_w] = float(val_w)
+                    
+                    # 수동 변동률 및 가중치 가져오기
+                    manual_macro_pcts = saved.get("manual_macro_pcts", {})
+                    manual_macro_weights = saved.get("manual_macro_weights", {})
+            except Exception:
+                pass
+
+        # 시간대에 따른 동적 가중치 조정 (나스닥 선물 vs 나스닥 주가) - hint용 기본 가중치 계산
+        dt = get_kst_now()
+        year = dt.year
+        dst_start = datetime.datetime(year, 3, 8)
+        while dst_start.weekday() != 6:
+            dst_start += datetime.timedelta(days=1)
+        dst_end = datetime.datetime(year, 11, 1)
+        while dst_end.weekday() != 6:
+            dst_end += datetime.timedelta(days=1)
+        is_dst = (dst_start <= dt < dst_end)
+        
+        open_hour, open_minute = (22, 30) if is_dst else (23, 30)
+        close_hour = 5 if is_dst else 6
+        curr_time = dt.time()
+        open_time = datetime.time(open_hour, open_minute)
+        close_time = datetime.time(close_hour, 0)
+        is_us_open = (open_time <= curr_time or curr_time < close_time)
+        
+        default_macro_w = macro_w.copy()
+        total_nasdaq_w = default_macro_w.get("Nasdaq_Future", 0.30) + default_macro_w.get("NASDAQ", 0.0)
+        if is_us_open:
+            default_macro_w["NASDAQ"] = total_nasdaq_w
+            default_macro_w["Nasdaq_Future"] = 0.0
+        else:
+            default_macro_w["Nasdaq_Future"] = total_nasdaq_w
+            default_macro_w["NASDAQ"] = 0.0
+
+        # TextFields for KODEX 200
+        kodex_price_field = ft.TextField(
+            label="KODEX 200 현재가 (원)",
+            value=str(k["current_price"]),
+            width=210,
+            height=48,
+            text_size=12,
+            border_color=border_card,
+            color=text_color
+        )
+        kodex_pct_field = ft.TextField(
+            label="KODEX 200 변동률 (%)",
+            value=f"{k['change_pct']:.2f}",
+            width=210,
+            height=48,
+            text_size=12,
+            border_color=border_card,
+            color=text_color
+        )
+        
+        # TextFields for AI Models (Width 165 for perfect alignment with KODEX 200 and Macro inputs)
+        ai_pct_fields = {}
+        ai_weight_fields = {}
+        for mdl in ["Gemini", "ChatGPT", "Claude", "Grok"]:
+            val_pct = ai_res.get(mdl, {}).get("change_pct", 0.0)
+            val_w = ai_w.get(mdl, 0.25)
+            ai_pct_fields[mdl] = ft.TextField(
+                label="예측률 (%)",
+                value=f"{val_pct:.2f}",
+                width=165,
+                height=48,
+                text_size=12,
+                border_color=border_card,
+                color=text_color
+            )
+            ai_weight_fields[mdl] = ft.TextField(
+                label="가중치 (%)",
+                value=f"{val_w * 100:.2f}",
+                width=165,
+                height=48,
+                text_size=12,
+                border_color=border_card,
+                color=text_color
+            )
+            
+        # TextFields for Consensus weights
+        con_ai_w_field = ft.TextField(
+            label="AI 합의 반영 비율 (%)",
+            value=f"{con_w.get('AI_Consensus', 0.50) * 100:.2f}",
+            width=210,
+            height=48,
+            text_size=12,
+            border_color=border_card,
+            color=text_color
+        )
+        con_macro_w_field = ft.TextField(
+            label="매크로 반영 비율 (%)",
+            value=f"{con_w.get('Macro_Dashboard', 0.30) * 100:.2f}",
+            width=210,
+            height=48,
+            text_size=12,
+            border_color=border_card,
+            color=text_color
+        )
+        con_news_w_field = ft.TextField(
+            label="실시간 뉴스 반영 비율 (%)",
+            value=f"{con_w.get('News_Consensus', 0.15) * 100:.2f}",
+            width=210,
+            height=48,
+            text_size=12,
+            border_color=border_card,
+            color=text_color
+        )
+        con_rumor_w_field = ft.TextField(
+            label="증권가 소문 반영 비율 (%)",
+            value=f"{con_w.get('Rumor_Consensus', 0.05) * 100:.2f}",
+            width=210,
+            height=48,
+            text_size=12,
+            border_color=border_card,
+            color=text_color
+        )
+
+        # TextFields for Macro indicators
+        macro_pct_fields = {}
+        macro_weight_fields = {}
+        important_keys = ["Kospi_Future", "Nasdaq_Future", "Fear_Greed_Index", "VIX_Index", "USD_KRW", "USD_JPY", "SOX_Index", "MSCI_Korea"]
+        other_keys = [key for key in MACRO_WEIGHTS.keys() if key not in important_keys]
+        all_keys = important_keys + other_keys
+        
+        for key in all_keys:
+            if key in macro_data:
+                label = MACRO_LABELS.get(key, key)
+                val_pct = macro_data[key].get("original_change_pct", macro_data[key].get("change_pct", 0.0))
+                val_w = default_macro_w.get(key, 0.0)
+                
+                # 변동률 입력 필드 설정
+                if key in manual_macro_pcts:
+                    pct_value = f"{manual_macro_pcts[key]:.2f}"
+                else:
+                    pct_value = f"{val_pct:.2f}"
+                
+                # 가중치 입력 필드 설정
+                if key in manual_macro_weights:
+                    w_value = f"{abs(manual_macro_weights[key]) * 100:.2f}"
+                else:
+                    w_value = f"{abs(val_w) * 100:.2f}"
+                
+                macro_pct_fields[key] = ft.TextField(
+                    label="변동률 (%)",
+                    value=pct_value,
+                    hint_text=f"실시간: {val_pct:.2f}",
+                    width=150,
+                    height=48,
+                    text_size=12,
+                    border_color=border_card,
+                    color=text_color
+                )
+                macro_weight_fields[key] = ft.TextField(
+                    label="가중치 (%)",
+                    value=w_value,
+                    hint_text=f"기본: {abs(val_w) * 100:.2f}",
+                    width=150,
+                    height=48,
+                    text_size=12,
+                    border_color=border_card,
+                    color=text_color
+                )
+                
+        # Build UI layout
+        dialog_content_controls = [
+            ft.Text("▣ KODEX 200 기본 정보", size=13, weight=ft.FontWeight.BOLD, color=accent_color),
+            ft.Row([kodex_price_field, kodex_pct_field], spacing=10),
+            ft.Divider(height=1, color=border_card),
+            
+            ft.Text("▣ 4대 AI 모델 예측치 및 가중치", size=13, weight=ft.FontWeight.BOLD, color=accent_color),
+        ]
+        
+        for mdl in ["Gemini", "ChatGPT", "Claude", "Grok"]:
+            dialog_content_controls.append(
+                ft.Row([
+                    ft.Text(mdl, size=11, weight=ft.FontWeight.BOLD, color=text_color, width=80),
+                    ai_pct_fields[mdl],
+                    ai_weight_fields[mdl]
+                ], spacing=10, vertical_alignment=ft.CrossAxisAlignment.CENTER)
+            )
+            
+        dialog_content_controls.extend([
+            ft.Divider(height=1, color=border_card),
+            ft.Text("▣ 최종 예측 결과 반영 비율 가중치 (AI, 매크로, 뉴스, 소문)", size=13, weight=ft.FontWeight.BOLD, color=accent_color),
+            ft.Row([con_ai_w_field, con_macro_w_field], spacing=10),
+            ft.Row([con_news_w_field, con_rumor_w_field], spacing=10),
+            ft.Divider(height=1, color=border_card),
+            
+            ft.Text("▣ 글로벌 매크로 지표 변동률 및 가중치", size=13, weight=ft.FontWeight.BOLD, color=accent_color),
+        ])
+        
+        for key in all_keys:
+            if key in macro_data:
+                label = MACRO_LABELS.get(key, key)
+                dialog_content_controls.append(
+                    ft.Row([
+                        ft.Text(label, size=11, color=text_color, width=110),
+                        macro_pct_fields[key],
+                        macro_weight_fields[key]
+                    ], spacing=10, vertical_alignment=ft.CrossAxisAlignment.CENTER)
+                )
+                
+        form_container = ft.Column(
+            controls=dialog_content_controls,
+            scroll=ft.ScrollMode.AUTO,
+            height=400,
+            width=460,
+            spacing=10
+        )
+        
+        def on_apply(e):
+            try:
+                # Parse basic info
+                new_kodex_price = int(float(kodex_price_field.value))
+                new_kodex_pct = float(kodex_pct_field.value)
+                
+                # Parse AI predictions and weights
+                new_ai_weights = {}
+                for mdl in ["Gemini", "ChatGPT", "Claude", "Grok"]:
+                    val = float(ai_pct_fields[mdl].value)
+                    self.ai_results[mdl]["change_pct"] = val
+                    self.ai_results[mdl]["target_price"] = int(new_kodex_price * (1 + val / 100))
+                    new_ai_weights[mdl] = float(ai_weight_fields[mdl].value) / 100
+                    
+                # Parse Consensus weights
+                new_consensus_weights = {
+                    "AI_Consensus": float(con_ai_w_field.value) / 100,
+                    "Macro_Dashboard": float(con_macro_w_field.value) / 100,
+                    "News_Consensus": float(con_news_w_field.value) / 100,
+                    "Rumor_Consensus": float(con_rumor_w_field.value) / 100
+                }
+                
+                # Parse Macro predictions and weights
+                new_manual_macro_weights = {}
+                new_manual_macro_pcts = {}
+                from src.config import BASE_MACRO_WEIGHTS
+                for key in all_keys:
+                    if key in macro_data:
+                        pct_text = macro_pct_fields[key].value.strip()
+                        w_text = macro_weight_fields[key].value.strip()
+                        
+                        # 원래 실시간 변동률과 기본 가중치
+                        val_pct = macro_data[key].get("original_change_pct", macro_data[key].get("change_pct", 0.0))
+                        val_w = default_macro_w.get(key, 0.0)
+                        
+                        # 변동률 처리 (입력값 존재하고, 디폴트/실시간과 다른 경우에만 수동 오버라이드로 추가)
+                        if pct_text:
+                            try:
+                                pct_val = float(pct_text)
+                                if abs(pct_val - val_pct) > 1e-4:
+                                    new_manual_macro_pcts[key] = pct_val
+                            except ValueError:
+                                pass
+                            
+                        # 가중치 처리 (입력값 존재하고, 디폴트/기본과 다른 경우에만 수동 오버라이드로 추가)
+                        if w_text:
+                            try:
+                                w_val_pct = float(w_text)
+                                if abs(w_val_pct - abs(val_w) * 100) > 1e-4:
+                                    base_w = BASE_MACRO_WEIGHTS.get(key, 0.0)
+                                    sign = 1.0 if base_w >= 0 else -1.0
+                                    new_manual_macro_weights[key] = (w_val_pct / 100) * sign
+                            except ValueError:
+                                pass
+                        
+                # Update data
+                self.current_data["kodex200"]["current_price"] = new_kodex_price
+                self.current_data["kodex200"]["change_pct"] = new_kodex_pct
+                
+                # Save settings back to file
+                _save_settings({
+                    "ai_weights": new_ai_weights,
+                    "consensus_weights": new_consensus_weights,
+                    "manual_macro_weights": new_manual_macro_weights,
+                    "manual_macro_pcts": new_manual_macro_pcts
+                })
+                
+                # 수동 오버라이드를 즉시 적용
+                self._apply_manual_overrides_to_current_data()
+                
+                # Recalculate
+                from src.ai_consensus import AIConsensusManager
+                mgr = AIConsensusManager(self.api_keys)
+                self.consensus_result = mgr.calculate_consensus(self.current_data, self.ai_results, new_ai_weights)
+                
+                # Refresh UI
+                self.display_analysis_results()
+                self._log("[시스템] 수동 입력 데이터 및 가중치 반영 완료. 예측 결과가 업데이트되었습니다.")
+                self.show_snack_bar("수동 입력 및 가중치 적용 완료", "#00E676")
+                self.page.pop_dialog()
+            except Exception as ex:
+                self.show_snack_bar(f"입력 오류: 올바른 값을 입력하세요. ({ex})", "#FF1744")
+                
+        dlg = ft.AlertDialog(
+            title=ft.Text("수동 데이터 입력 및 시뮬레이션", size=16, weight=ft.FontWeight.BOLD, color=accent_color),
+            content=form_container,
+            actions=[
+                ft.TextButton("취소", on_click=lambda _: self.page.pop_dialog()),
+                ft.ElevatedButton("적용", on_click=on_apply, bgcolor="#00E676", color="#121824")
+            ]
+        )
+        self.page.show_dialog(dlg)
+
+    def show_calculation_basis_dialog(self, e):
+        if not self.current_data or not self.ai_results or not self.consensus_result:
+            self.show_snack_bar("아직 분석 결과가 없습니다. '분석 실행'을 먼저 해주세요.", "#FF1744")
+            return
+            
+        is_dark = self.page.theme_mode == ft.ThemeMode.DARK
+        accent_color = "#C084FC" if is_dark else "#7C3AED"
+        border_card = "#2E3A4E" if is_dark else "#78909C"
+        text_color = "#E0E6ED" if is_dark else "#000000"
+        
+        # Count keywords for news
+        news_list = self.current_data.get("news", [])
+        news_pos_keywords = ["상승", "호재", "급등", "개선", "기대", "돌파", "반등", "활황", "출발", "뛰기", "유입", "안정", "매수세", "순매수"]
+        news_neg_keywords = ["하락", "악재", "급락", "악화", "우려", "위험", "위축", "약세", "피눈물", "감소", "매도세", "순매도", "리스크"]
+        news_pos_cnt = 0
+        news_neg_cnt = 0
+        for text in news_list:
+            for w in news_pos_keywords:
+                if w in text: news_pos_cnt += 1
+            for w in news_neg_keywords:
+                if w in text: news_neg_cnt += 1
+        news_sentiment = 0.0
+        if news_pos_cnt + news_neg_cnt > 0:
+            news_sentiment = (news_pos_cnt - news_neg_cnt) / (news_pos_cnt + news_neg_cnt)
+            
+        # Count keywords for rumors
+        rumors_list = self.current_data.get("rumors", [])
+        rumors_pos_keywords = ["상승", "호재", "급등", "개선", "기대", "돌파", "반등", "활황", "수혜", "유입", "안정", "단독", "비둘기", "공급"]
+        rumors_neg_keywords = ["하락", "악재", "급락", "악화", "우려", "위험", "위축", "약세", "피눈물", "매파", "유출", "조정", "악재"]
+        rumor_pos_cnt = 0
+        rumor_neg_cnt = 0
+        for text in rumors_list:
+            for w in rumors_pos_keywords:
+                if w in text: rumor_pos_cnt += 1
+            for w in rumors_neg_keywords:
+                if w in text: rumor_neg_cnt += 1
+        rumor_sentiment = 0.0
+        if rumor_pos_cnt + rumor_neg_cnt > 0:
+            rumor_sentiment = (rumor_pos_cnt - rumor_neg_cnt) / (rumor_pos_cnt + rumor_neg_cnt)
+            
+        con_res = self.consensus_result
+        components = con_res.get("components", {})
+        ai_val = components.get("AI_Consensus", 0.0)
+        macro_val = components.get("Macro_Dashboard", 0.0)
+        news_val = components.get("News_Consensus", 0.0)
+        rumor_val = components.get("Rumor_Consensus", 0.0)
+        final_val = con_res.get("change_pct", 0.0)
+        target_price = con_res.get("target_price", 0)
+        
+        from src.ai_consensus import _get_configured_ai_weights
+        ai_w = _get_configured_ai_weights()
+        
+        ai_rows = []
+        for mdl in ["Gemini", "ChatGPT", "Claude", "Grok"]:
+            w = ai_w.get(mdl, 0.25)
+            val = self.ai_results.get(mdl, {}).get("change_pct", 0.0)
+            ai_rows.append(
+                ft.Row([
+                    ft.Text(f"• {mdl}", size=11, color=text_color, width=110),
+                    ft.Text(f"예측치: {val:+.2f}%", size=11, color=text_color, width=110),
+                    ft.Text(f"가중치: {w*100:.1f}%", size=11, color=text_color, width=110),
+                    ft.Text(f"기여도: {val * w:+.2f}%", size=11, color=accent_color, width=90)
+                ], spacing=10)
+            )
+            
+        from src.ai_consensus import _get_configured_macro_weights
+        m = self.current_data["macro"]
+        timestamp = self.current_data.get("timestamp")
+        final_macro_weights = _get_configured_macro_weights(timestamp, m)
+        
+        # Check rate scaling
+        all_text_pool = " ".join(news_list + rumors_list)
+        rate_keywords = ["금리", "기준금리", "금리인상", "금리인하", "한국은행 금리", "채권금리", "인상 예정", "인하 예정", "금리 동결", "통화정책"]
+        has_rate_issue = any(kw in all_text_pool for kw in rate_keywords)
+        
+        macro_rows = []
+        from src.config import MACRO_LABELS
+        macro_rows.append(
+            ft.Container(
+                content=ft.Row([
+                    ft.Text("지표명", size=11, weight=ft.FontWeight.BOLD, color=text_color, width=140),
+                    ft.Text("실시간 변동률", size=11, weight=ft.FontWeight.BOLD, color=text_color, width=100),
+                    ft.Text("연산 가중치", size=11, weight=ft.FontWeight.BOLD, color=text_color, width=100),
+                    ft.Text("기여도", size=11, weight=ft.FontWeight.BOLD, color=text_color, width=80),
+                ], spacing=10),
+                padding=ft.Padding(bottom=5, top=0, left=0, right=0),
+                border=ft.Border(bottom=ft.BorderSide(1, border_card))
+            )
+        )
+        
+        for key, weight in final_macro_weights.items():
+            if weight != 0.0 and key in m:
+                label = MACRO_LABELS.get(key, key)
+                pct = m[key].get("change_pct", 0.0)
+                contribution = pct * weight
+                macro_rows.append(
+                    ft.Row([
+                        ft.Text(label, size=11, color=text_color, width=140),
+                        ft.Text(f"{pct:+.2f}%", size=11, color=text_color, width=100),
+                        ft.Text(f"{abs(weight)*100:.2f}%", size=11, color=text_color, width=100),
+                        ft.Text(f"{contribution:+.2f}%", size=11, color=accent_color, width=80),
+                    ], spacing=10)
+                )
+                
+        dialog_content_controls = [
+            ft.Container(
+                content=ft.Column([
+                    ft.Text("▣ 종합 예측 결과 산출 공식", size=13, weight=ft.FontWeight.BOLD, color=accent_color),
+                    ft.Text("최종 예측 변동률 = (AI 합계 × 50%) + (매크로 합계 × 30%) + (뉴스 합계 × 15%) + (소문 합계 × 5%)", size=11, color=text_color),
+                    ft.Container(
+                        content=ft.Column([
+                            ft.Row([
+                                ft.Text("• AI     합산    예측치", size=11, color=text_color, width=130),
+                                ft.Text(f":  {ai_val:+.2f}% (기여도: {ai_val * 0.5:+.2f}%)", size=11, color=text_color, expand=True)
+                            ], spacing=0),
+                            ft.Row([
+                                ft.Text("• 매크로 합산 예측치", size=11, color=text_color, width=130),
+                                ft.Text(f":  {macro_val:+.2f}% (기여도: {macro_val * 0.3:+.2f}%)", size=11, color=text_color, expand=True)
+                            ], spacing=0),
+                            ft.Row([
+                                ft.Text("• 실시간 뉴스 예측치", size=11, color=text_color, width=130),
+                                ft.Text(f":  {news_val:+.2f}% (기여도: {news_val * 0.15:+.2f}%)", size=11, color=text_color, expand=True)
+                            ], spacing=0),
+                            ft.Row([
+                                ft.Text("• 증권가 소문 예측치", size=11, color=text_color, width=130),
+                                ft.Text(f":  {rumor_val:+.2f}% (기여도: {rumor_val * 0.05:+.2f}%)", size=11, color=text_color, expand=True)
+                            ], spacing=0),
+                            ft.Divider(height=1, color=border_card),
+                            ft.Text(f"★ 최종 예측 변동률: {final_val:+.2f}%  →  예상 시초가: {target_price:,}원", size=12, weight=ft.FontWeight.BOLD, color=accent_color),
+                        ], spacing=4),
+                        padding=10,
+                        bgcolor="#1A2333" if is_dark else "#F1F5F9",
+                        border_radius=6,
+                        border=ft.Border.all(1, border_card)
+                    )
+                ], spacing=6),
+                padding=ft.Padding(bottom=10, top=0, left=0, right=0)
+            ),
+            
+            ft.Divider(height=1, color=border_card),
+            
+            ft.Text("▣ 1단계: 4대 AI 모델 가중치 상세", size=13, weight=ft.FontWeight.BOLD, color=accent_color),
+            ft.Column(controls=ai_rows, spacing=4),
+            
+            ft.Divider(height=1, color=border_card),
+            
+            ft.Text("▣ 2단계: 글로벌 매크로 지표 가중치 상세", size=13, weight=ft.FontWeight.BOLD, color=accent_color),
+        ]
+        
+        if has_rate_issue:
+            dialog_content_controls.append(
+                ft.Container(
+                    content=ft.Text("※ 금리 관련 주요 키워드 감지: 국내 금리 및 채권 가중치가 2.0배 자동 상향 적용되었습니다.", size=10, color="#FFB74D", weight=ft.FontWeight.BOLD),
+                    padding=5,
+                    bgcolor="#2C1F10" if is_dark else "#FFF3E0",
+                    border_radius=4
+                )
+            )
+            
+        dialog_content_controls.append(ft.Column(controls=macro_rows, spacing=4))
+        
+        dialog_content_controls.extend([
+            ft.Divider(height=1, color=border_card),
+            
+            ft.Text("▣ 3단계: 실시간 속보 뉴스 감성 분석 상세", size=13, weight=ft.FontWeight.BOLD, color=accent_color),
+            ft.Column([
+                ft.Text(f"• 수집된 실시간 뉴스 수: {len(news_list)}개", size=11, color=text_color),
+                ft.Text(f"• 발견된 호재 키워드 수: {news_pos_cnt}개 / 악재 키워드 수: {news_neg_cnt}개", size=11, color=text_color),
+                ft.Text(f"• 뉴스 감성 지수: {news_sentiment:+.2f} (범위: -1.0 ~ +1.0)", size=11, color=text_color),
+                ft.Text(f"• 뉴스 반영 예측률 (지수 × 1.5%): {news_val:+.2f}%", size=11, color=accent_color, weight=ft.FontWeight.BOLD),
+            ], spacing=4),
+            
+            ft.Divider(height=1, color=border_card),
+            
+            ft.Text("▣ 4단계: 증권가 소문/이슈 감성 분석 상세", size=13, weight=ft.FontWeight.BOLD, color=accent_color),
+            ft.Column([
+                ft.Text(f"• 수집된 증권가 소문 수: {len(rumors_list)}개", size=11, color=text_color),
+                ft.Text(f"• 발견된 호재 키워드 수: {rumor_pos_cnt}개 / 악재 키워드 수: {rumor_neg_cnt}개", size=11, color=text_color),
+                ft.Text(f"• 소문 감성 지수: {rumor_sentiment:+.2f} (범위: -1.0 ~ +1.0)", size=11, color=text_color),
+                ft.Text(f"• 소문 반영 예측률 (지수 × 1.0%): {rumor_val:+.2f}%", size=11, color=accent_color, weight=ft.FontWeight.BOLD),
+            ], spacing=4)
+        ])
+        
+        scroll_container = ft.Column(
+            controls=dialog_content_controls,
+            scroll=ft.ScrollMode.AUTO,
+            height=450,
+            width=500,
+            spacing=12
+        )
+        
+        dlg = ft.AlertDialog(
+            title=ft.Text("최종 예측 산출 근거 및 가중치 상세 분석", size=16, weight=ft.FontWeight.BOLD, color=accent_color),
+            content=scroll_container,
+            actions=[
+                ft.TextButton("닫기", on_click=lambda _: self.page.pop_dialog())
+            ]
+        )
+        self.page.show_dialog(dlg)
+
     # ─── 테마 스위치 및 관련 핸들러 ───
     def toggle_theme(self, e):
         is_dark = self.theme_switch.value
@@ -1754,6 +2386,19 @@ class StockPredictorApp:
         accent_color = "#C084FC" if is_dark else "#7C3AED"
         self.theme_switch.bgcolor = "#2196F3" if is_dark else "#475569"
         self.theme_switch.border = ft.Border.all(1, "#78909C")
+        
+        self.manual_input_btn.content.color = accent_color
+        self.manual_input_btn.style = ft.ButtonStyle(
+            side={"": ft.BorderSide(1, accent_color)},
+            shape=ft.RoundedRectangleBorder(radius=4),
+            padding=ft.Padding(left=6, right=6, top=0, bottom=0),
+        )
+        self.calc_basis_btn.content.color = accent_color
+        self.calc_basis_btn.style = ft.ButtonStyle(
+            side={"": ft.BorderSide(1, accent_color)},
+            shape=ft.RoundedRectangleBorder(radius=4),
+            padding=ft.Padding(left=6, right=6, top=0, bottom=0),
+        )
 
         self.page.bgcolor = bg_main
         
@@ -2322,7 +2967,7 @@ class StockPredictorApp:
             "Technical_Analysis1": lambda v: "",
             "Technical_Analysis2": lambda v: "",
             "Nikkei_225": lambda v: f"{v:,.2f}",
-            "Shanghai_Composite": lambda v: f"{v:,.2f}",
+            "Fear_Greed_Index": lambda v: f"{v:,.2f}",
             "MSCI_Korea": lambda v: f"{v:,.2f}",
             "Short_Selling": lambda v: f"{v:,.2f}",
             "Famous_Remarks": lambda v: f"{v:,.2f}",

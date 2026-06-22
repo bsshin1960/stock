@@ -35,7 +35,6 @@ TICKER_US10Y = "^TNX"            # 미국 10년물 국채 금리
 TICKER_WTI = "CL=F"              # WTI 크루드 오일 선물
 TICKER_VIX = "^VIX"              # CBOE Volatility Index (공포 지수)
 TICKER_SOX = "^SOX"              # 필라델피아 반도체 지수
-TICKER_SHANGHAI = "000001.SS"      # 상해 종합 지수
 TICKER_DOLLAR = "DX-Y.NYB"       # US 달러 인덱스
 TICKER_GOLD = "GC=F"             # 금 선물
 TICKER_US_CPI = "CPIAUCSL"       # 미국 소비자 물가지수 (FRED)
@@ -88,7 +87,7 @@ MACRO_WEIGHTS = {
     "Technical_Analysis1": 0.00,
     "Technical_Analysis2": 0.00,
     "Nikkei_225": 0.00,
-    "Shanghai_Composite": 0.00,
+    "Fear_Greed_Index": 0.00,
     "MSCI_Korea": 0.00,
     "Short_Selling": 0.00,
     "Famous_Remarks": 0.00,
@@ -100,7 +99,7 @@ MACRO_WEIGHTS = {
 # 기본 매크로 상대적 가중치 기준 (동적 연산용)
 BASE_MACRO_WEIGHTS = {
     "Kospi_Future": 0.28,
-    "Nasdaq_Future": 0.15,
+    "Nasdaq_Future": 0.30,
     "Kodex200": 0.08,
     "USD_KRW": -0.04,
     "USD_JPY": -0.03,
@@ -116,7 +115,7 @@ BASE_MACRO_WEIGHTS = {
     "Technical_Analysis1": 0.05,
     "Technical_Analysis2": 0.05,
     "Nikkei_225": 0.01,
-    "Shanghai_Composite": 0.01,
+    "Fear_Greed_Index": 0.01,
     "MSCI_Korea": 0.02,
     "Short_Selling": -0.02,
     "Famous_Remarks": 0.01,
@@ -144,7 +143,7 @@ MACRO_LABELS = {
     "Technical_Analysis1": "기술적분석1",
     "Technical_Analysis2": "기술적분석2",
     "Nikkei_225": "일본 닛케이",
-    "Shanghai_Composite": "상해 종합지수",
+    "Fear_Greed_Index": "공포·탐욕 지수",
     "MSCI_Korea": "MSCI 한국 ETF 종가",
     "Short_Selling": "상위종목공매도",
     "Famous_Remarks": "유명인사 발언",

@@ -8,7 +8,7 @@ from src.config import (
     TICKER_KODEX200, TICKER_SAMSUNG, TICKER_HYNIX,
     TICKER_KOSPI_FUTURE, TICKER_NASDAQ_FUTURE,
     TICKER_USD_KRW, TICKER_USD_JPY, TICKER_GOLD, TICKER_US10Y, TICKER_WTI, TICKER_VIX,
-    TICKER_SOX, TICKER_SHANGHAI, TICKER_DOLLAR, TICKER_US_CPI,
+    TICKER_SOX, TICKER_DOLLAR, TICKER_US_CPI,
     TICKER_NIKKEI, TICKER_EWY, TICKER_BITCOIN, TICKER_US_RATE, TICKER_NASDAQ,
     get_kst_now, get_kst_today
 )
@@ -137,13 +137,29 @@ class DataCollector:
             "SOX_Index": TICKER_SOX,        # 필라델피아 반도체 지수
             "Dollar_Index": TICKER_DOLLAR,  # 달러 인덱스
             "Nikkei_225": TICKER_NIKKEI,    # 일본 닛케이 225
-            "Shanghai_Composite": TICKER_SHANGHAI, # 상해 종합
             "MSCI_Korea": TICKER_EWY,        # MSCI 한국 ETF
             "Bitcoin": TICKER_BITCOIN,       # 비트코인
             "NASDAQ": TICKER_NASDAQ,         # 나스닥 종합지수
         }
 
         for name, ticker_code in tickers.items():
+            if name == "Nasdaq_Future":
+                try:
+                    res_nf = requests.get('https://query1.finance.yahoo.com/v8/finance/chart/NQ=F?range=1d&interval=1m', headers={'User-Agent': 'Mozilla/5.0'}, timeout=5)
+                    if res_nf.status_code == 200:
+                        nf_data = res_nf.json()
+                        meta = nf_data['chart']['result'][0]['meta']
+                        price = meta['regularMarketPrice']
+                        prev_close = meta['previousClose']
+                        change_pct = ((price - prev_close) / prev_close) * 100
+                        indicators["Nasdaq_Future"] = {
+                            "value": round(price, 4),
+                            "change_pct": round(change_pct, 2)
+                        }
+                        continue
+                except Exception as e_nf:
+                    print(f"[Warning] 나스닥 선물 초정밀 수집 실패, 일반 yfinance 폴백 사용: {e_nf}")
+
             try:
                 ticker = yf.Ticker(ticker_code, session=self.session)
                 df = ticker.history(period="5d", timeout=5)
@@ -190,7 +206,6 @@ class DataCollector:
                     "SOX_Index": {"value": 4920.50, "change_pct": 0.55},
                     "Dollar_Index": {"value": 104.50, "change_pct": 0.12},
                     "Nikkei_225": {"value": 38720.50, "change_pct": -0.42},
-                    "Shanghai_Composite": {"value": 3110.25, "change_pct": 0.15},
                     "MSCI_Korea": {"value": 62.45, "change_pct": 0.42},
                     "Bitcoin": {"value": 66250.00, "change_pct": 1.45},
                     "US_Rate": {"value": 5.25, "change_pct": 0.0},
@@ -359,6 +374,29 @@ class DataCollector:
                 "value": 325400.0,
                 "change_pct": -0.45
             }
+
+        # CNN 공포·탐욕 지수 (Fear & Greed Index) 수집
+        fg_val = 50.0
+        fg_pct = 0.0
+        try:
+            fg_url = "https://production.dataviz.cnn.io/index/fearandgreed/graphdata"
+            fg_headers = {
+                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+            }
+            res_fg = requests.get(fg_url, headers=fg_headers, timeout=5)
+            if res_fg.status_code == 200:
+                fg_data = res_fg.json().get("fear_and_greed", {})
+                fg_val = float(fg_data.get("score", 50.0))
+                fg_prev = float(fg_data.get("previous_close", 50.0))
+                if fg_prev != 0.0:
+                    fg_pct = ((fg_val - fg_prev) / fg_prev) * 100
+        except Exception as e:
+            print(f"[Warning] 공포·탐욕 지수 수집 실패: {e}")
+
+        indicators["Fear_Greed_Index"] = {
+            "value": round(fg_val, 2),
+            "change_pct": round(fg_pct, 2)
+        }
 
         return indicators
 
