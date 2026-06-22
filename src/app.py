@@ -1844,8 +1844,9 @@ class StockPredictorApp:
 
     def update_scroll_dimensions(self):
         try:
-            # 1. 브라우저/창 세로 크기 감지
+            # 1. 브라우저/창 크기 감지
             page_h = float(self.page.height) if self.page.height is not None else 1030.0
+            page_w = float(self.page.width) if self.page.width is not None else 1340.0
             
             # 2. 메뉴바(약 30px)와 하단 여백을 감안하여 스크롤바 레일 높이 동적 설정
             rail_height = max(300.0, page_h - 40.0)
@@ -1873,11 +1874,21 @@ class StockPredictorApp:
             ratio = current_top / self.allowed_max_top if self.allowed_max_top > 0.0 else 0.0
             self.vertical_scroll_content.top = -ratio * self.dynamic_max_scroll
             
-            # 7. 변경사항 UI 업데이트 반영
+            # 7. 스크롤바 미적용(wheel) 모드일 때 네이티브 스크롤바 위치가 화면 우측 끝으로 이동하도록 너비 조정
+            if self.scroll_mode != "scrollbar":
+                self.vertical_scroll_column.width = max(1297.0, page_w)
+            else:
+                self.vertical_scroll_column.width = 1297.0
+            
+            # 8. 변경사항 UI 업데이트 반영
             self.scroll_rail.update()
             self.scroll_rail_bg.update()
             self.scroll_detector.update()
             self.vertical_scroll_content.update()
+            try:
+                self.vertical_scroll_column.update()
+            except Exception:
+                pass
         except Exception as e:
             print(f"[Warning] update_scroll_dimensions failed: {e}")
 
