@@ -1012,7 +1012,7 @@ class StockPredictorApp:
         # 4. Horizontal scroll row wrapping the GestureDetector
         reason_horizontal_scroll = ft.Row(
             controls=[reason_detector],
-            scroll=ft.ScrollMode.HIDDEN,
+            scroll=ft.ScrollMode.ALWAYS,
             vertical_alignment=ft.CrossAxisAlignment.STRETCH,
             width=285,
             height=105,
@@ -2182,6 +2182,8 @@ class StockPredictorApp:
             self.is_menu_open = False
 
     def handle_dashboard_scroll(self, e: ft.ScrollEvent):
+        if self.scroll_mode == "scrollbar":
+            return
         # 1. 휠 이벤트의 y 방향 이동 방향 감지
         direction = 1.0 if e.scroll_delta.y > 0 else -1.0
         
