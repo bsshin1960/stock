@@ -90,6 +90,8 @@ class StockPredictorApp:
         self.is_programmatic_scroll = False
         self.top10_scroll_index = 0
         self.kodex_history_scroll_index = 0
+        self.allowed_max_top = 550.0
+        self.dynamic_max_scroll = 610.0
 
 
         self.data_collector = DataCollector()
@@ -811,12 +813,17 @@ class StockPredictorApp:
         self.page.on_resize = self.handle_resize
 
         # 전체 화면 구성: 가로 스크롤 영역(scrollable_body)과 상시 노출될 수직 스크롤 레일(scroll_rail)을 가로 배치
-        self.page.add(
-            ft.Row([
-                self.scrollable_body,
-                self.scroll_rail
-            ], spacing=0, expand=True)
-        )
+        self.main_row = ft.Row([
+            self.scrollable_body,
+            self.scroll_rail
+        ], spacing=0, expand=True, vertical_alignment=ft.CrossAxisAlignment.START)
+        self.page.add(self.main_row)
+        
+        # 레일 높이 및 이동 범위 최초 계산
+        try:
+            self.update_scroll_dimensions()
+        except Exception:
+            pass
         self.page.window.width = 1340
         self.page.window.height = 1030
         self.page.window.min_width = 300
@@ -1430,6 +1437,10 @@ class StockPredictorApp:
             self.scroll_rail.visible = True
             self.vertical_scroll = self.dashboard_scroll_detector
             self.dashboard_column.controls[1] = self.dashboard_scroll_detector
+            try:
+                self.update_scroll_dimensions()
+            except Exception:
+                pass
         else:
             self.vertical_scroll_content.content = None
             self.vertical_scroll_column.content.controls = [body_ctrl]
@@ -1827,6 +1838,45 @@ class StockPredictorApp:
     def handle_dashboard_scroll(self, e: ft.ScrollEvent):
         return
 
+    def update_scroll_dimensions(self):
+        try:
+            # 1. 브라우저/창 세로 크기 감지
+            page_h = float(self.page.height) if self.page.height is not None else 1030.0
+            
+            # 2. 메뉴바(약 30px)와 하단 여백을 감안하여 스크롤바 레일 높이 동적 설정
+            rail_height = max(300.0, page_h - 40.0)
+            
+            # 3. 레일 및 내부 스택 높이 업데이트
+            self.scroll_rail.height = rail_height
+            self.scroll_rail.content.height = rail_height
+            self.scroll_rail_bg.height = rail_height
+            
+            # 4. 스크롤바 핸들의 이동 가능 범위 설정 (핸들 높이 80px)
+            max_top = rail_height - 80.0
+            self.allowed_max_top = max_top # 1/5 가중치 제거하여 맨 아래까지 원활하게 드래그 가능
+            
+            # 5. 콘텐츠 전체 높이와 뷰포트 높이 기반 최대 스크롤 범위 계산
+            content_height = 1560.0
+            viewport_height = max(100.0, page_h - 40.0)
+            self.dynamic_max_scroll = max(0.0, content_height - viewport_height)
+            
+            # 6. 핸들 위치 보정 및 이동에 맞춘 콘텐츠 위치 갱신
+            current_top = float(self.scroll_detector.top) if self.scroll_detector.top is not None else 0.0
+            if current_top > self.allowed_max_top:
+                current_top = self.allowed_max_top
+                self.scroll_detector.top = current_top
+                
+            ratio = current_top / self.allowed_max_top if self.allowed_max_top > 0.0 else 0.0
+            self.vertical_scroll_content.top = -ratio * self.dynamic_max_scroll
+            
+            # 7. 변경사항 UI 업데이트 반영
+            self.scroll_rail.update()
+            self.scroll_rail_bg.update()
+            self.scroll_detector.update()
+            self.vertical_scroll_content.update()
+        except Exception as e:
+            print(f"[Warning] update_scroll_dimensions failed: {e}")
+
     def handle_drag_scroll(self, e):
         delta_y = 0.0
         if e.local_delta is not None:
@@ -1837,9 +1887,7 @@ class StockPredictorApp:
         current_top = float(self.scroll_detector.top) if self.scroll_detector.top is not None else 0.0
         new_top = current_top + delta_y
         
-        max_top = 700.0 - 80.0
-        # 1/5만 움직여도 자료의 맨 아래까지 볼 수 있도록 조절 (이동 범위를 1/5인 124px로 제한)
-        allowed_max_top = max_top / 5.0
+        allowed_max_top = getattr(self, "allowed_max_top", 550.0)
         if new_top < 0:
             new_top = 0.0
         elif new_top > allowed_max_top:
@@ -1847,13 +1895,9 @@ class StockPredictorApp:
             
         self.scroll_detector.top = new_top
         
-        ratio = new_top / allowed_max_top
+        ratio = new_top / allowed_max_top if allowed_max_top > 0.0 else 0.0
         
-        # Calculate dynamic scroll height to ensure we can scroll precisely to the bottom
-        content_height = 1560.0
-        viewport_height = float(self.vertical_scroll.height) if self.vertical_scroll.height is not None else 950.0
-        dynamic_max_scroll = max(0.0, content_height - viewport_height)
-        
+        dynamic_max_scroll = getattr(self, "dynamic_max_scroll", 610.0)
         target_offset = ratio * dynamic_max_scroll
         self.last_scroll_offset = target_offset
 
@@ -3318,6 +3362,7 @@ class StockPredictorApp:
 
     def handle_resize(self, e):
         try:
+            self.update_scroll_dimensions()
             self.page.update()
         except Exception:
             pass
