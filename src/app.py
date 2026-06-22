@@ -794,7 +794,7 @@ class StockPredictorApp:
     def _mk_ai_card(self, model_name, display_name, color):
         lp = ft.Text("- %", size=18, weight=ft.FontWeight.BOLD, color="#475569")
         lprice = ft.Text("- 원", size=14, weight=ft.FontWeight.BOLD, color="#0F172A")
-        lr = ft.Text("대기 중...", size=11, color="#475569", no_wrap=True, style=ft.TextStyle(height=1.91))
+        lr = ft.Text("대기 중...", size=11, color="#475569", no_wrap=True, style=ft.TextStyle(height=1.45))
         
         is_dark = self.page.theme_mode == ft.ThemeMode.DARK
         accent_color = "#C084FC" if is_dark else "#7C3AED"
@@ -816,11 +816,9 @@ class StockPredictorApp:
                 ft.Divider(color="#CBD5E1", thickness=1, height=1),
                 price_pct_row,
                 ft.Container(
-                    content=ft.Row([
-                        ft.Column([lr], scroll=ft.ScrollMode.AUTO)
-                    ], scroll=ft.ScrollMode.ALWAYS, vertical_alignment=ft.CrossAxisAlignment.STRETCH, expand=True),
+                    content=ft.Column([lr], scroll=ft.ScrollMode.AUTO, expand=True),
                     expand=True,
-                    margin=ft.Margin(top=5)
+                    margin=ft.Margin(top=5, bottom=8)
                 ),
             ], spacing=0),
             bgcolor="#FFFFFF", padding=12, border_radius=12, border=ft.Border.all(1, "#78909C"), width=309, height=196,
