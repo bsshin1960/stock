@@ -80,8 +80,10 @@ class AIReasonWrapper:
         if self.row:
             if self.app and self.app.scroll_mode == "wheel":
                 self.row.top = None
+                self.row.height = None
             else:
                 self.row.top = 0
+                self.row.height = 105
         
         lines = [line for line in text.split("\n") if line.strip()] if text else []
         if not lines:
@@ -1032,6 +1034,7 @@ class StockPredictorApp:
         if self.scroll_mode == "wheel":
             reason_horizontal_scroll.top = None
             reason_horizontal_scroll.animate_position = None
+            reason_horizontal_scroll.height = None
             v_col = ft.Column(
                 controls=[reason_horizontal_scroll],
                 scroll=ft.ScrollMode.ALWAYS,
@@ -1044,6 +1047,7 @@ class StockPredictorApp:
         else:
             reason_horizontal_scroll.top = 0
             reason_horizontal_scroll.animate_position = 150
+            reason_horizontal_scroll.height = 105
             reason_container_content = reason_detector
             
         reason_container = ft.Container(
@@ -2093,6 +2097,7 @@ class StockPredictorApp:
                 if self.scroll_mode == "wheel":
                     row.top = None
                     row.animate_position = None
+                    row.height = None
                     
                     if row in viewport.controls:
                         viewport.controls.remove(row)
@@ -2115,6 +2120,7 @@ class StockPredictorApp:
                     container.content = v_col
                 else:
                     row.animate_position = 150
+                    row.height = 105
                     current_idx = self.ai_scroll_indices.get(mdl, 0)
                     row.top = -current_idx * 21.0
                     
