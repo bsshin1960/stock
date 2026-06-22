@@ -914,16 +914,10 @@ class StockPredictorApp:
             expand=True
         )
 
-        if self.scroll_mode == "scrollbar":
-            self.vertical_scroll_content.content = body
-            self.scroll_rail.visible = True
-            self.vertical_scroll = self.dashboard_scroll_detector
-            self.vertical_scroll_column.width = 1297
-        else:
-            self.vertical_scroll_column.content.controls = [body]
-            self.scroll_rail.visible = False
-            self.vertical_scroll = self.vertical_scroll_column
-            self.vertical_scroll_column.width = None
+        self.vertical_scroll_content.content = body
+        self.scroll_rail.visible = (self.scroll_mode == "scrollbar")
+        self.vertical_scroll = self.dashboard_scroll_detector
+        self.vertical_scroll_column.width = 1297
 
         # 메뉴바와 세로 본문을 감싸는 대시보드 컬럼
         self.dashboard_column = ft.Column(
@@ -1696,33 +1690,9 @@ class StockPredictorApp:
             _save_settings({"scroll_mode_mobile": mode})
         else:
             _save_settings({"scroll_mode_pc": mode})
-        body_ctrl = None
-        if self.vertical_scroll_content.content is not None:
-            body_ctrl = self.vertical_scroll_content.content
-        elif len(self.vertical_scroll_column.content.controls) > 0:
-            body_ctrl = self.vertical_scroll_column.content.controls[0]
-        if body_ctrl is None:
-            return
-        if mode == "scrollbar":
-            self.vertical_scroll_column.content.controls.clear()
-            self.vertical_scroll_content.content = body_ctrl
-            self.vertical_scroll_content.top = 0
-            self.scroll_detector.top = 0
-            self.scroll_rail.visible = True
-            self.vertical_scroll = self.dashboard_scroll_detector
-            self.dashboard_column.controls[1] = self.dashboard_scroll_detector
-            self.vertical_scroll_column.width = 1297
-            try:
-                self.update_scroll_dimensions()
-            except Exception:
-                pass
-        else:
-            self.vertical_scroll_content.content = None
-            self.vertical_scroll_column.content.controls = [body_ctrl]
-            self.scroll_rail.visible = False
-            self.vertical_scroll = self.vertical_scroll_column
-            self.dashboard_column.controls[1] = self.vertical_scroll_column
-            self.vertical_scroll_column.width = None
+            
+        self.scroll_rail.visible = (mode == "scrollbar")
+        
         try:
             self.apply_scroll_mode_to_inner_boxes()
         except Exception:
@@ -2105,19 +2075,8 @@ class StockPredictorApp:
         # 1. Close menubar dropdowns
         self.handle_body_hover(e)
         
-        # 2. Disable/enable dashboard scroll in wheel mode
-        if self.scroll_mode != "wheel":
-            return
-        is_hovered = (e.data == "true")
-        self.is_box_hovered = is_hovered
-        
-        scroll_col = self.vertical_scroll_column.content
-        if scroll_col:
-            scroll_col.scroll = None if is_hovered else ft.ScrollMode.AUTO
-            try:
-                scroll_col.update()
-            except Exception:
-                pass
+        # 2. Set hover flag (scroll is disabled in handle_dashboard_scroll when True)
+        self.is_box_hovered = (e.data == "true")
 
     def apply_scroll_mode_to_inner_boxes(self):
         # 1. Update Top 10
@@ -2196,6 +2155,8 @@ class StockPredictorApp:
 
     def handle_dashboard_scroll(self, e: ft.ScrollEvent):
         if self.scroll_mode == "scrollbar":
+            return
+        if getattr(self, "is_box_hovered", False):
             return
         # 1. 휠 이벤트의 y 방향 이동 방향 감지
         direction = 1.0 if e.scroll_delta.y > 0 else -1.0
