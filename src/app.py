@@ -40,11 +40,12 @@ def _save_settings(data: dict):
 
 
 class AIReasonWrapper:
-    def __init__(self, column, viewport, scroll_indices, model_name):
+    def __init__(self, column, viewport, scroll_indices, model_name, row=None):
         self.column = column
         self.viewport = viewport
         self.scroll_indices = scroll_indices
         self.model_name = model_name
+        self.row = row
         self._color = "#475569"
         self._value = "대기 중..."
         self.value = "대기 중..."
@@ -75,6 +76,8 @@ class AIReasonWrapper:
         if self.model_name in self.scroll_indices:
             self.scroll_indices[self.model_name] = 0
         self.column.top = 0
+        if self.row:
+            self.row.top = 0
         
         lines = [line for line in text.split("\n") if line.strip()] if text else []
         if not lines:
@@ -89,10 +92,11 @@ class AIReasonWrapper:
                 max_width = line_w
                 
         self.column.width = max_width
-        self.viewport.width = max_width
         
         try:
             self.column.update()
+            if self.row:
+                self.row.update()
             self.viewport.update()
         except Exception:
             pass
@@ -156,6 +160,9 @@ class StockPredictorApp:
         self.last_ai_scroll_times = {}
         self.ai_reason_detectors = {}
         self.ai_reason_containers = {}
+        self.ai_reason_rows = {}
+        self.ai_reason_viewports = {}
+        self.ai_reason_vertical_columns = {}
 
 
         self.data_collector = DataCollector()
@@ -938,35 +945,50 @@ class StockPredictorApp:
         lp = ft.Text("- %", size=18, weight=ft.FontWeight.BOLD, color="#475569")
         lprice = ft.Text("- 원", size=14, weight=ft.FontWeight.BOLD, color="#0F172A")
         
+        # 1. Text column containing actual lines
         reason_lv = ft.Column(
             spacing=0,
-            top=0,
-            left=0,
-            animate_position=150
-        )
-        
-        reason_viewport = ft.Stack(
-            controls=[reason_lv],
-            expand=True,
-            clip_behavior=ft.ClipBehavior.HARD_EDGE,
             width=285
         )
         
+        # 2. Horizontal scroll row wrapping the text column
+        reason_horizontal_scroll = ft.Row(
+            controls=[reason_lv],
+            scroll=ft.ScrollMode.ALWAYS,
+            vertical_alignment=ft.CrossAxisAlignment.STRETCH,
+            width=285,
+            height=105,
+            spacing=0
+        )
+        
+        # 3. Stack viewport wrapping the horizontal scroll row
+        reason_viewport = ft.Stack(
+            controls=[reason_horizontal_scroll],
+            expand=True,
+            clip_behavior=ft.ClipBehavior.HARD_EDGE,
+            width=285,
+            height=105
+        )
+        
+        # 4. GestureDetector wrapping Stack viewport
         reason_detector = ft.GestureDetector(
             content=reason_viewport,
             on_scroll=lambda e: self.handle_ai_reason_wheel(e, model_name),
         )
         
         self.ai_reason_columns[model_name] = reason_lv
+        self.ai_reason_rows[model_name] = reason_horizontal_scroll
+        self.ai_reason_viewports[model_name] = reason_viewport
+        self.ai_reason_detectors[model_name] = reason_detector
         self.ai_scroll_indices[model_name] = 0
         self.last_ai_scroll_times[model_name] = 0.0
-        self.ai_reason_detectors[model_name] = reason_detector
         
         lr_wrapper = AIReasonWrapper(
             column=reason_lv,
             viewport=reason_viewport,
             scroll_indices=self.ai_scroll_indices,
-            model_name=model_name
+            model_name=model_name,
+            row=reason_horizontal_scroll
         )
         
         is_dark = self.page.theme_mode == ft.ThemeMode.DARK
@@ -998,19 +1020,26 @@ class StockPredictorApp:
             )
         )
         
-        # Ensure reason_lv configuration matches scroll mode
+        # Ensure initial configuration matches scroll mode
         if self.scroll_mode == "wheel":
-            reason_lv.scroll = ft.ScrollMode.ALWAYS
-            reason_lv.height = 105
-            reason_lv.top = 0
+            reason_horizontal_scroll.top = None
+            reason_horizontal_scroll.animate_position = None
+            v_col = ft.Column(
+                controls=[reason_horizontal_scroll],
+                scroll=ft.ScrollMode.ALWAYS,
+                height=105,
+                width=285,
+                spacing=0
+            )
+            self.ai_reason_vertical_columns[model_name] = v_col
+            reason_container_content = v_col
         else:
-            reason_lv.scroll = None
-            reason_lv.height = None
+            reason_horizontal_scroll.top = 0
+            reason_horizontal_scroll.animate_position = 150
+            reason_container_content = reason_detector
             
         reason_container = ft.Container(
-            content=ft.Row([
-                reason_detector
-            ], scroll=ft.ScrollMode.ALWAYS, vertical_alignment=ft.CrossAxisAlignment.STRETCH, expand=True),
+            content=reason_container_content,
             expand=True,
             margin=ft.Margin(top=5),
             theme=local_scrollbar_theme,
@@ -1033,6 +1062,7 @@ class StockPredictorApp:
         )
         c.data = {"pct": lp, "price": lprice, "reason": lr_wrapper, "title_txt": title_txt}
         return c
+
 
     def _mk_macro_card(self, title, subtitle="", is_technical=False, hide_values=False):
         lv = ft.Text("" if (is_technical or hide_values) else "-", size=13, weight=ft.FontWeight.BOLD, color="#0F172A")
@@ -1434,12 +1464,14 @@ class StockPredictorApp:
         new_idx = max(0, min(max_idx, current_idx + direction))
         self.ai_scroll_indices[model_name] = new_idx
         
+        reason_row = self.ai_reason_rows[model_name]
         item_height = 21.0
-        reason_lv.top = -new_idx * item_height
+        reason_row.top = -new_idx * item_height
         try:
-            reason_lv.update()
+            reason_row.update()
         except Exception:
             pass
+
 
 
 
@@ -2045,17 +2077,49 @@ class StockPredictorApp:
 
         # 3. Update AI cards reason containers
         for mdl in ["Gemini", "ChatGPT", "Claude", "Grok"]:
-            if mdl in self.ai_reason_columns:
-                reason_lv = self.ai_reason_columns[mdl]
+            if mdl in self.ai_reason_containers:
+                container = self.ai_reason_containers[mdl]
+                detector = self.ai_reason_detectors[mdl]
+                viewport = self.ai_reason_viewports[mdl]
+                row = self.ai_reason_rows[mdl]
+                col = self.ai_reason_columns[mdl]
+                
                 if self.scroll_mode == "wheel":
-                    reason_lv.scroll = ft.ScrollMode.ALWAYS
-                    reason_lv.height = 105
-                    reason_lv.top = 0
+                    row.top = None
+                    row.animate_position = None
+                    
+                    if row in viewport.controls:
+                        viewport.controls.remove(row)
+                        
+                    v_col = self.ai_reason_vertical_columns.get(mdl)
+                    if not v_col:
+                        v_col = ft.Column(
+                            controls=[row],
+                            scroll=ft.ScrollMode.ALWAYS,
+                            height=105,
+                            width=285,
+                            spacing=0
+                        )
+                        self.ai_reason_vertical_columns[mdl] = v_col
+                    else:
+                        v_col.scroll = ft.ScrollMode.ALWAYS
+                        v_col.height = 105
+                        if row not in v_col.controls:
+                            v_col.controls = [row]
+                    container.content = v_col
                 else:
-                    reason_lv.scroll = None
-                    reason_lv.height = None
+                    row.animate_position = 150
                     current_idx = self.ai_scroll_indices.get(mdl, 0)
-                    reason_lv.top = -current_idx * 21.0
+                    row.top = -current_idx * 21.0
+                    
+                    v_col = self.ai_reason_vertical_columns.get(mdl)
+                    if v_col and row in v_col.controls:
+                        v_col.controls.remove(row)
+                        
+                    if row not in viewport.controls:
+                        viewport.controls = [row]
+                    container.content = detector
+
 
         # 4. Trigger UI update
         try:
