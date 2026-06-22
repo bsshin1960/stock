@@ -1014,8 +1014,8 @@ class StockPredictorApp:
         title_txt = ft.Text(display_name, size=13, weight=ft.FontWeight.BOLD, color="#0F172A")
         
         # Local theme for the horizontal and vertical scrollbars in AI analysis result box
-        scroll_color = "#7E8B9B" if is_dark else "#78909C"
-        hover_color = "#C084FC" if is_dark else "#7C3AED"
+        scroll_color = "#807E8B9B" if is_dark else "#8078909C"
+        hover_color = "#80C084FC" if is_dark else "#807C3AED"
         local_scrollbar_theme = ft.Theme(
             scrollbar_theme=ft.ScrollbarTheme(
                 thumb_visibility=True,
@@ -1036,7 +1036,7 @@ class StockPredictorApp:
             reason_horizontal_scroll.top = None
             reason_horizontal_scroll.animate_position = None
             reason_horizontal_scroll.height = 105
-            reason_lv.scroll = ft.ScrollMode.ALWAYS
+            reason_lv.scroll = ft.ScrollMode.HIDDEN
             reason_lv.height = 105
             reason_container_content = reason_horizontal_scroll
         else:
@@ -2095,7 +2095,7 @@ class StockPredictorApp:
                     row.top = None
                     row.animate_position = None
                     row.height = 105
-                    col.scroll = ft.ScrollMode.ALWAYS
+                    col.scroll = ft.ScrollMode.HIDDEN
                     col.height = 105
                     
                     if row in viewport.controls:
