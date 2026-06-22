@@ -1038,12 +1038,13 @@ class StockPredictorApp:
             reason_lv.height = 105
             reason_container_content = reason_horizontal_scroll
         else:
-            reason_horizontal_scroll.top = 0
-            reason_horizontal_scroll.animate_position = 150
+            reason_horizontal_scroll.top = None
+            reason_horizontal_scroll.animate_position = None
             reason_horizontal_scroll.height = 105
             reason_lv.scroll = None
             reason_lv.height = None
-            reason_container_content = reason_detector
+            reason_lv.top = 0
+            reason_container_content = reason_horizontal_scroll
             
         reason_container = ft.Container(
             content=reason_container_content,
