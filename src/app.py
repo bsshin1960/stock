@@ -1442,6 +1442,13 @@ class StockPredictorApp:
             pass
 
     def handle_ai_reason_wheel(self, e: ft.ScrollEvent, model_name: str):
+        import time
+        now = time.time()
+        last_time = self.last_ai_scroll_times.get(model_name, 0.0)
+        if now - last_time < 0.15:
+            return
+        self.last_ai_scroll_times[model_name] = now
+
         direction = 1 if e.scroll_delta.y > 0 else -1
         visible_count = 5
         reason_lv = self.ai_reason_columns[model_name]
