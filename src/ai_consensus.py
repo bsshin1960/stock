@@ -735,12 +735,12 @@ class AIConsensusManager:
                 mock_pred = self._get_mock_prediction(model_name, data)
                 mock_lines = [l.strip() for l in mock_pred["reason"].split("\n") if l.strip()]
                 for ml in mock_lines:
-                    if len(lines) >= 11:
+                    if len(lines) >= 10:
                         break
                     if ml not in lines:
                         lines.append(ml)
-            elif len(lines) > 20:
-                lines = lines[:20]
+            elif len(lines) > 30:
+                lines = lines[:30]
             reason = "\n".join(lines)
             
             return {

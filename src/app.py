@@ -84,7 +84,7 @@ class AIReasonWrapper:
         lines = [line for line in text.split("\n") if line.strip()] if text else []
         if not lines:
             lines = ["대기 중..."]
-        lines = lines[:15]
+        lines = lines[:30]
             
         max_width = 285
         for line in lines:
