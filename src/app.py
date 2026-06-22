@@ -761,10 +761,17 @@ class StockPredictorApp:
             self.scroll_rail.visible = False
             self.vertical_scroll = self.vertical_scroll_column
 
-        # 2. 가로 Row (스크롤바 없이 화면에 고정)
+        # 메뉴바와 세로 본문을 감싸는 대시보드 컬럼
+        self.dashboard_column = ft.Column(
+            [self.menubar, self.vertical_scroll],
+            spacing=0,
+            expand=True
+        )
+
+        # 2. 가로 Row (대시보드 영역만 가로 스크롤 적용)
         self.scrollable_body = ft.Row(
-            [self.vertical_scroll, self.scroll_rail],
-            scroll=None,
+            [self.dashboard_column],
+            scroll=ft.ScrollMode.AUTO,
             expand=True,
             vertical_alignment=ft.CrossAxisAlignment.START,
             spacing=0
@@ -773,10 +780,12 @@ class StockPredictorApp:
         self.page.scroll = None
         self.page.on_resize = self.handle_resize
 
+        # 전체 화면 구성: 가로 스크롤 영역(scrollable_body)과 상시 노출될 수직 스크롤 레일(scroll_rail)을 가로 배치
         self.page.add(
             ft.Row([
-                ft.Column([self.menubar, self.scrollable_body], spacing=0, expand=True)
-            ], scroll=ft.ScrollMode.AUTO, expand=True)
+                self.scrollable_body,
+                self.scroll_rail
+            ], spacing=0, expand=True)
         )
         self.page.window.width = 1340
         self.page.window.height = 1030
@@ -1381,14 +1390,15 @@ class StockPredictorApp:
             self.scroll_detector.top = 0
             self.scroll_rail.visible = True
             self.vertical_scroll = self.dashboard_scroll_detector
-            self.scrollable_body.controls[0] = self.dashboard_scroll_detector
+            self.dashboard_column.controls[1] = self.dashboard_scroll_detector
         else:
             self.vertical_scroll_content.content = None
             self.vertical_scroll_column.content.controls = [body_ctrl]
             self.scroll_rail.visible = False
             self.vertical_scroll = self.vertical_scroll_column
-            self.scrollable_body.controls[0] = self.vertical_scroll_column
+            self.dashboard_column.controls[1] = self.vertical_scroll_column
         try:
+            self.dashboard_column.update()
             self.scrollable_body.update()
             self.scroll_rail.update()
         except Exception:
