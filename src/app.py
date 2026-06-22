@@ -76,19 +76,15 @@ class AIReasonWrapper:
         self.column.controls.clear()
         if self.model_name in self.scroll_indices:
             self.scroll_indices[self.model_name] = 0
-        self.column.top = None
+        self.column.top = 0
         if self.row:
-            if self.app and self.app.scroll_mode == "wheel":
-                self.row.top = None
-                self.row.height = 105
-            else:
-                self.row.top = 0
-                self.row.height = 105
+            self.row.top = None
+            self.row.height = 105
         
         lines = [line for line in text.split("\n") if line.strip()] if text else []
         if not lines:
             lines = ["대기 중..."]
-        lines = lines[:10]
+        lines = lines[:15]
             
         max_width = 285
         for line in lines:
@@ -99,12 +95,13 @@ class AIReasonWrapper:
                 max_width = line_w
                 
         self.column.width = max_width
+        self.viewport.width = max_width
         
         try:
             self.column.update()
+            self.viewport.update()
             if self.row:
                 self.row.update()
-            self.viewport.update()
         except Exception:
             pass
 
@@ -957,32 +954,33 @@ class StockPredictorApp:
         # 1. Text column containing actual lines
         reason_lv = ft.Column(
             spacing=0,
-            width=285
-        )
-        
-        # 2. Horizontal scroll row wrapping the text column
-        reason_horizontal_scroll = ft.Row(
-            controls=[reason_lv],
-            scroll=ft.ScrollMode.ALWAYS,
-            vertical_alignment=ft.CrossAxisAlignment.STRETCH,
             width=285,
-            height=105,
-            spacing=0
+            animate_position=80
         )
         
-        # 3. Stack viewport wrapping the horizontal scroll row
+        # 2. Stack viewport wrapping the Column
         reason_viewport = ft.Stack(
-            controls=[reason_horizontal_scroll],
+            controls=[reason_lv],
             expand=True,
             clip_behavior=ft.ClipBehavior.HARD_EDGE,
             width=285,
             height=105
         )
         
-        # 4. GestureDetector wrapping Stack viewport
+        # 3. GestureDetector wrapping Stack viewport
         reason_detector = ft.GestureDetector(
             content=reason_viewport,
             on_scroll=lambda e: self.handle_ai_reason_wheel(e, model_name),
+        )
+        
+        # 4. Horizontal scroll row wrapping the GestureDetector
+        reason_horizontal_scroll = ft.Row(
+            controls=[reason_detector],
+            scroll=ft.ScrollMode.ALWAYS,
+            vertical_alignment=ft.CrossAxisAlignment.STRETCH,
+            width=285,
+            height=105,
+            spacing=0
         )
         
         self.ai_reason_columns[model_name] = reason_lv
@@ -1452,14 +1450,6 @@ class StockPredictorApp:
             pass
 
     def handle_ai_reason_wheel(self, e: ft.ScrollEvent, model_name: str):
-        if self.scroll_mode == "wheel":
-            return
-        import time
-        now = time.time()
-        if now - self.last_ai_scroll_times.get(model_name, 0.0) < 0.15:
-            return
-        self.last_ai_scroll_times[model_name] = now
-
         direction = 1 if e.scroll_delta.y > 0 else -1
         visible_count = 5
         reason_lv = self.ai_reason_columns[model_name]
@@ -1472,11 +1462,11 @@ class StockPredictorApp:
         new_idx = max(0, min(max_idx, current_idx + direction))
         self.ai_scroll_indices[model_name] = new_idx
         
-        reason_row = self.ai_reason_rows[model_name]
+        col = self.ai_reason_columns[model_name]
         item_height = 21.0
-        reason_row.top = -new_idx * item_height
+        col.top = -new_idx * item_height
         try:
-            reason_row.update()
+            col.update()
         except Exception:
             pass
 
@@ -2092,31 +2082,16 @@ class StockPredictorApp:
                 col = self.ai_reason_columns[mdl]
                 
                 if self.scroll_mode == "wheel":
-                    row.top = None
-                    row.animate_position = None
-                    row.height = 105
                     col.scroll = ft.ScrollMode.HIDDEN
                     col.height = 105
-                    
-                    if row in viewport.controls:
-                        viewport.controls.remove(row)
-                        
+                    col.top = None
                     container.content = row
                 else:
-                    row.animate_position = 150
-                    row.height = 105
-                    current_idx = self.ai_scroll_indices.get(mdl, 0)
-                    row.top = -current_idx * 21.0
                     col.scroll = None
                     col.height = None
-                    
-                    v_col = self.ai_reason_vertical_columns.get(mdl)
-                    if v_col and row in v_col.controls:
-                        v_col.controls.remove(row)
-                        
-                    if row not in viewport.controls:
-                        viewport.controls = [row]
-                    container.content = detector
+                    current_idx = self.ai_scroll_indices.get(mdl, 0)
+                    col.top = -current_idx * 21.0
+                    container.content = row
 
 
         # 4. Trigger UI update

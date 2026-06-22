@@ -613,12 +613,12 @@ class AIConsensusManager:
         selected_rumor = rumors[0] if rumors else "증권가 풍문 요인 미비"
         clean_rumor = selected_rumor.replace("[단독 루머] ", "").replace("[소문] ", "").replace("[찌라시] ", "").replace("[반도체설] ", "").replace("[수급 소문] ", "")
         
-        # 각 모델별 관심 매크로 지표 정의 (우선순위 후보군)
+        # 각 모델별 관심 매크로 지표 정의 (우선순위 후보군, 15개 확보)
         model_candidates = {
-            "Gemini": ["Kospi_Future", "Samsung", "Hynix", "Technical_Analysis1", "Technical_Analysis2", "SOX_Index", "MSCI_Korea", "USD_KRW", "VIX_Index", "NASDAQ", "US10Y_Treasury", "Short_Selling"],
-            "ChatGPT": ["Kospi_Future", "Nasdaq_Future", "Kodex200", "VIX_Index", "Technical_Analysis2", "SOX_Index", "NASDAQ", "USD_KRW", "Bitcoin", "Gold_Future", "US_CPI", "US_Rate"],
-            "Claude": ["US_CPI", "USD_KRW", "USD_JPY", "US10Y_Treasury", "Samsung", "KR_Rate", "KR_Bond", "US_Rate", "SOX_Index", "Famous_Remarks", "Nikkei_225", "Fear_Greed_Index"],
-            "Grok": ["VIX_Index", "WTI_Crude", "Kospi_Future", "USD_KRW", "Bitcoin", "Technical_Analysis1", "Famous_Remarks", "Nasdaq_Future", "NASDAQ", "Gold_Future", "Dollar_Index", "MSCI_Korea"]
+            "Gemini": ["Kospi_Future", "Samsung", "Hynix", "Technical_Analysis1", "Technical_Analysis2", "SOX_Index", "MSCI_Korea", "USD_KRW", "VIX_Index", "NASDAQ", "US10Y_Treasury", "Short_Selling", "WTI_Crude", "Dollar_Index", "Fear_Greed_Index"],
+            "ChatGPT": ["Kospi_Future", "Nasdaq_Future", "Kodex200", "VIX_Index", "Technical_Analysis2", "SOX_Index", "NASDAQ", "USD_KRW", "Bitcoin", "Gold_Future", "US_CPI", "US_Rate", "Samsung", "Hynix", "US10Y_Treasury"],
+            "Claude": ["US_CPI", "USD_KRW", "USD_JPY", "US10Y_Treasury", "Samsung", "KR_Rate", "KR_Bond", "US_Rate", "SOX_Index", "Famous_Remarks", "Nikkei_225", "Fear_Greed_Index", "MSCI_Korea", "Kospi_Future", "Hynix"],
+            "Grok": ["VIX_Index", "WTI_Crude", "Kospi_Future", "USD_KRW", "Bitcoin", "Technical_Analysis1", "Famous_Remarks", "Nasdaq_Future", "NASDAQ", "Gold_Future", "Dollar_Index", "MSCI_Korea", "US_Rate", "Nikkei_225", "Samsung"]
         }
         
         candidates = model_candidates.get(model_name, ["Kospi_Future", "Samsung", "Technical_Analysis1"])
@@ -646,7 +646,7 @@ class AIConsensusManager:
         scored_candidates.sort(key=lambda x: x[0], reverse=True)
         
         bullet_points = []
-        for imp, factor, val in scored_candidates[:10]:
+        for imp, factor, val in scored_candidates[:14]:
             # 각 지표에 따른 다이나믹 텍스트 생성
             if factor == "Kospi_Future":
                 txt = f"• [코스피 선물] 야간 코스피 200 선물 지수가 {val:+.2f}% 변동하여 개장 초반 지수 출발 강도 결정"
@@ -729,18 +729,18 @@ class AIConsensusManager:
             target_price = int(parsed.get("target_price", data["kodex200"]["current_price"]))
             reason = parsed.get("reason", "분석이 정상 완료되었습니다.")
             
-            # 10개 이상 항목 강제 제한 및 보정
+            # 15개 이상 항목 강제 제한 및 보정
             lines = [line.strip() for line in reason.split("\n") if line.strip().startswith("•") or line.strip().startswith("-")]
-            if len(lines) < 10:
+            if len(lines) < 15:
                 mock_pred = self._get_mock_prediction(model_name, data)
                 mock_lines = [l.strip() for l in mock_pred["reason"].split("\n") if l.strip()]
                 for ml in mock_lines:
-                    if len(lines) >= 11:
+                    if len(lines) >= 16:
                         break
                     if ml not in lines:
                         lines.append(ml)
-            elif len(lines) > 15:
-                lines = lines[:15]
+            elif len(lines) > 20:
+                lines = lines[:20]
             reason = "\n".join(lines)
             
             return {
