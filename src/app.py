@@ -774,12 +774,14 @@ class StockPredictorApp:
         self.page.on_resize = self.handle_resize
 
         self.page.add(
-            ft.Column([self.menubar, self.scrollable_body], spacing=0, expand=True)
+            ft.Row([
+                ft.Column([self.menubar, self.scrollable_body], spacing=0, expand=True)
+            ], scroll=ft.ScrollMode.AUTO, expand=True)
         )
         self.page.window.width = 1340
         self.page.window.height = 1030
-        self.page.window.min_width = 1340
-        self.page.window.min_height = 1030
+        self.page.window.min_width = 300
+        self.page.window.min_height = 300
         if self.display_mode == "maximized":
             self.page.window.maximized = True
         try:
