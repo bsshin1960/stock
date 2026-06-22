@@ -97,6 +97,23 @@ class AIReasonWrapper:
         self.column.width = max_width
         self.viewport.width = max_width
         
+        # 커스텀 스크롤바 높이 및 상태 초기화
+        if self.app and hasattr(self.app, "ai_scroll_handles") and self.model_name in self.app.ai_scroll_handles:
+            handle = self.app.ai_scroll_handles[self.model_name]
+            total_items = len(lines)
+            visible_count = 5
+            if total_items > visible_count:
+                handle.visible = True
+                handle_h = max(15.0, (visible_count / total_items) * 105.0)
+                handle.height = handle_h
+                handle.top = 0.0
+            else:
+                handle.visible = False
+            try:
+                handle.update()
+            except Exception:
+                pass
+
         try:
             self.column.update()
             self.viewport.update()
@@ -168,6 +185,7 @@ class StockPredictorApp:
         self.ai_reason_rows = {}
         self.ai_reason_viewports = {}
         self.ai_reason_vertical_columns = {}
+        self.ai_scroll_handles = {}
 
 
 
@@ -951,16 +969,32 @@ class StockPredictorApp:
         lp = ft.Text("- %", size=18, weight=ft.FontWeight.BOLD, color="#475569")
         lprice = ft.Text("- 원", size=14, weight=ft.FontWeight.BOLD, color="#0F172A")
         
+        is_dark = self.page.theme_mode == ft.ThemeMode.DARK
+
         # 1. Text column containing actual lines
         reason_lv = ft.Column(
             spacing=0,
-            width=285,
+            width=275,
             animate_position=80
         )
         
-        # 2. Stack viewport wrapping the Column
+        # AI 카드 내부의 커스텀 수직 스크롤바 핸들
+        ai_handle = ft.Container(
+            width=4,
+            height=40,
+            bgcolor="#7E8B9B" if is_dark else "#B0BEC5",
+            border_radius=2,
+            top=0,
+            right=2,
+            visible=False
+        )
+        
+        # 2. Stack viewport wrapping the Column & scroll handle
         reason_viewport = ft.Stack(
-            controls=[reason_lv],
+            controls=[
+                ft.Container(content=reason_lv, width=275, top=0, left=0),
+                ai_handle
+            ],
             expand=True,
             clip_behavior=ft.ClipBehavior.HARD_EDGE,
             width=285,
@@ -976,7 +1010,7 @@ class StockPredictorApp:
         # 4. Horizontal scroll row wrapping the GestureDetector
         reason_horizontal_scroll = ft.Row(
             controls=[reason_detector],
-            scroll=ft.ScrollMode.ALWAYS,
+            scroll=ft.ScrollMode.HIDDEN,
             vertical_alignment=ft.CrossAxisAlignment.STRETCH,
             width=285,
             height=105,
@@ -987,6 +1021,7 @@ class StockPredictorApp:
         self.ai_reason_rows[model_name] = reason_horizontal_scroll
         self.ai_reason_viewports[model_name] = reason_viewport
         self.ai_reason_detectors[model_name] = reason_detector
+        self.ai_scroll_handles[model_name] = ai_handle
         self.ai_scroll_indices[model_name] = 0
         self.last_ai_scroll_times[model_name] = 0.0
         
@@ -1466,6 +1501,23 @@ class StockPredictorApp:
         col = self.ai_reason_columns[model_name]
         item_height = 21.0
         col.top = -new_idx * item_height
+        
+        # 커스텀 스크롤바 핸들 위치 업데이트
+        if model_name in self.ai_scroll_handles:
+            handle = self.ai_scroll_handles[model_name]
+            if total_items > visible_count:
+                handle.visible = True
+                handle_h = max(15.0, (visible_count / total_items) * 105.0)
+                max_handle_top = 105.0 - handle_h
+                handle.height = handle_h
+                handle.top = (new_idx / max_idx) * max_handle_top
+            else:
+                handle.visible = False
+            try:
+                handle.update()
+            except Exception:
+                pass
+
         try:
             col.update()
         except Exception:
@@ -2082,17 +2134,25 @@ class StockPredictorApp:
                 row = self.ai_reason_rows[mdl]
                 col = self.ai_reason_columns[mdl]
                 
-                if self.scroll_mode == "wheel":
-                    col.scroll = ft.ScrollMode.HIDDEN
-                    col.height = 105
-                    col.top = None
-                    container.content = row
-                else:
-                    col.scroll = None
-                    col.height = None
-                    current_idx = self.ai_scroll_indices.get(mdl, 0)
-                    col.top = -current_idx * 21.0
-                    container.content = row
+                col.scroll = None
+                col.height = None
+                current_idx = self.ai_scroll_indices.get(mdl, 0)
+                col.top = -current_idx * 21.0
+                container.content = row
+                
+                # 커스텀 스크롤바 상태 업데이트
+                if mdl in self.ai_scroll_handles:
+                    handle = self.ai_scroll_handles[mdl]
+                    total_items = len(col.controls)
+                    visible_count = 5
+                    if total_items > visible_count:
+                        handle.visible = True
+                        handle_h = max(15.0, (visible_count / total_items) * 105.0)
+                        max_handle_top = 105.0 - handle_h
+                        handle.height = handle_h
+                        handle.top = (current_idx / (total_items - visible_count)) * max_handle_top
+                    else:
+                        handle.visible = False
 
 
         # 4. Trigger UI update
