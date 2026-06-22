@@ -1085,8 +1085,8 @@ class StockPredictorApp:
             
         reason_container = ft.Container(
             content=reason_container_content,
-            expand=True,
-            margin=ft.Margin(top=5),
+            height=105,
+            margin=ft.Margin(top=5, left=0, right=0, bottom=0),
             theme=local_scrollbar_theme,
             on_hover=self.handle_scroll_box_hover
         )
@@ -1102,7 +1102,7 @@ class StockPredictorApp:
                 price_pct_row,
                 reason_container,
             ], spacing=0),
-            bgcolor="#FFFFFF", padding=ft.Padding(left=12, right=12, top=12, bottom=2), border_radius=12, border=ft.Border.all(1, "#78909C"), width=309, height=196,
+            bgcolor="#FFFFFF", padding=ft.Padding(left=12, right=12, top=12, bottom=1), border_radius=12, border=ft.Border.all(1, "#78909C"), width=309, height=None,
             on_hover=self.handle_body_hover
         )
         c.data = {"pct": lp, "price": lprice, "reason": lr_wrapper, "title_txt": title_txt}
