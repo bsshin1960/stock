@@ -102,7 +102,37 @@ class StockPredictorApp:
             "Claude": saved.get("api_key_claude", "") or ENV_API_KEYS.get("Claude", ""),
             "Grok": saved.get("api_key_grok", "") or ENV_API_KEYS.get("Grok", ""),
         }
-        self.scroll_mode = saved.get("scroll_mode", "scrollbar")
+        
+        # 스마트폰/PC 플랫폼 감지하여 기본값 설정
+        is_mobile = False
+        platform_name = ""
+        try:
+            if self.page.platform is not None:
+                if hasattr(self.page.platform, "value"):
+                    platform_name = str(self.page.platform.value).lower()
+                else:
+                    platform_name = str(self.page.platform).lower()
+            
+            if platform_name in ["android", "ios"]:
+                is_mobile = True
+        except Exception:
+            pass
+
+        try:
+            if not is_mobile and self.page.client_user_agent:
+                ua = self.page.client_user_agent.lower()
+                if any(kw in ua for kw in ["android", "iphone", "ipad", "ipod", "mobi"]):
+                    is_mobile = True
+        except Exception:
+            pass
+
+        self.is_mobile = is_mobile
+
+        # 플랫폼별 개별 설정 로드 (서로 덮어쓰지 않도록 분리)
+        if is_mobile:
+            self.scroll_mode = saved.get("scroll_mode_mobile", "wheel")
+        else:
+            self.scroll_mode = saved.get("scroll_mode_pc", "scrollbar")
         self.display_mode = saved.get("display_mode", "default")
 
         self.current_data = None
@@ -798,6 +828,12 @@ class StockPredictorApp:
         except Exception:
             pass
         self._log(f"✔ UI 레이아웃 로드 완료 - 메인 폭: 1274px, 창 너비: {self.page.window.width}px")
+        # 디바이스 정보 및 스크롤 모드 로그 추가
+        try:
+            self._log(f"[환경 감지] 플랫폼: {self.page.platform} | Web: {self.page.web} | 모바일 여부: {getattr(self, 'is_mobile', False)}")
+            self._log(f"[설정 적용] 스크롤 모드: {'스크롤바 미적용 (wheel)' if self.scroll_mode == 'wheel' else '스크롤바 적용 (scrollbar)'}")
+        except Exception:
+            pass
         # 앱 시작 시 TOP10 주가 비동기 조회
         self.page.run_thread(self._fetch_top10)
 
@@ -1375,7 +1411,10 @@ class StockPredictorApp:
 
     def update_scroll_mode(self, mode: str):
         self.scroll_mode = mode
-        _save_settings({"scroll_mode": mode})
+        if getattr(self, "is_mobile", False):
+            _save_settings({"scroll_mode_mobile": mode})
+        else:
+            _save_settings({"scroll_mode_pc": mode})
         body_ctrl = None
         if self.vertical_scroll_content.content is not None:
             body_ctrl = self.vertical_scroll_content.content
