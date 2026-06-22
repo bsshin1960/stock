@@ -2128,8 +2128,8 @@ class StockPredictorApp:
         # 2. 현재 스크롤바 핸들의 위치 가져오기
         current_top = float(self.scroll_detector.top) if self.scroll_detector.top is not None else 0.0
         
-        # 3. 휠 1칸당 스크롤바 핸들을 20px씩 이동시킴
-        wheel_step = 20.0
+        # 3. 휠 1칸당 스크롤바 핸들을 21px씩 이동시킴
+        wheel_step = 21.0
         new_top = current_top + (direction * wheel_step)
         
         # 4. 허용 범위 내로 제한
