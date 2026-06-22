@@ -1235,6 +1235,12 @@ class StockPredictorApp:
                 print(f"[Error] Fallback KODEX 200 history failed: {inner_ex}")
 
     def handle_top10_wheel(self, e: ft.ScrollEvent):
+        import time
+        now = time.time()
+        if now - getattr(self, "last_top10_scroll_time", 0.0) < 0.15:
+            return
+        self.last_top10_scroll_time = now
+
         direction = 1 if e.scroll_delta.y > 0 else -1
         visible_count = 5
         total_items = len(self.top10_lv.controls)
@@ -1251,6 +1257,12 @@ class StockPredictorApp:
             pass
 
     def handle_kodex_history_wheel(self, e: ft.ScrollEvent):
+        import time
+        now = time.time()
+        if now - getattr(self, "last_kodex_scroll_time", 0.0) < 0.15:
+            return
+        self.last_kodex_scroll_time = now
+
         direction = 1 if e.scroll_delta.y > 0 else -1
         visible_count = 5
         total_items = len(self.kodex_history_lv.controls)
@@ -1840,7 +1852,39 @@ class StockPredictorApp:
             self.is_menu_open = False
 
     def handle_dashboard_scroll(self, e: ft.ScrollEvent):
-        return
+        # 1. 휠 이벤트의 y 방향 이동 방향 감지
+        direction = 1.0 if e.scroll_delta.y > 0 else -1.0
+        
+        # 2. 현재 스크롤바 핸들의 위치 가져오기
+        current_top = float(self.scroll_detector.top) if self.scroll_detector.top is not None else 0.0
+        
+        # 3. 휠 1칸당 스크롤바 핸들을 20px씩 이동시킴
+        wheel_step = 20.0
+        new_top = current_top + (direction * wheel_step)
+        
+        # 4. 허용 범위 내로 제한
+        allowed_max_top = getattr(self, "allowed_max_top", 550.0)
+        if new_top < 0:
+            new_top = 0.0
+        elif new_top > allowed_max_top:
+            new_top = allowed_max_top
+            
+        self.scroll_detector.top = new_top
+        
+        # 5. 비율 계산 및 콘텐츠 위치 스크롤 적용
+        ratio = new_top / allowed_max_top if allowed_max_top > 0.0 else 0.0
+        dynamic_max_scroll = getattr(self, "dynamic_max_scroll", 610.0)
+        target_offset = ratio * dynamic_max_scroll
+        self.last_scroll_offset = target_offset
+        
+        self.vertical_scroll_content.top = -target_offset
+        
+        # 6. UI 업데이트
+        try:
+            self.scroll_detector.update()
+            self.vertical_scroll_content.update()
+        except Exception:
+            pass
 
     def update_scroll_dimensions(self):
         try:
