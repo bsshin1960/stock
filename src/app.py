@@ -2079,8 +2079,8 @@ class StockPredictorApp:
         # 2. 현재 스크롤바 핸들의 위치 가져오기
         current_top = float(self.scroll_detector.top) if self.scroll_detector.top is not None else 0.0
         
-        # 3. 휠 1칸당 스크롤바 핸들을 60px씩 이동시킴
-        wheel_step = 60.0
+        # 3. 휠 1칸당 스크롤바 핸들을 180px씩 이동시킴 (추가 3배 상향)
+        wheel_step = 180.0
         new_top = current_top + (direction * wheel_step)
         
         # 4. 허용 범위 내로 제한
@@ -2139,17 +2139,21 @@ class StockPredictorApp:
             ratio = current_top / self.allowed_max_top if self.allowed_max_top > 0.0 else 0.0
             self.vertical_scroll_content.top = -ratio * self.dynamic_max_scroll
             
-            # 7. 스크롤바 미적용(wheel) 모드일 때 네이티브 스크롤바 위치가 화면 우측 끝으로 이동하도록 너비 조정
-            if self.scroll_mode != "scrollbar":
-                self.vertical_scroll_column.width = max(1297.0, page_w)
-            else:
-                self.vertical_scroll_column.width = 1297.0
+            # 7. 스크롤바 미적용(wheel) 모드일 때 및 전체 창 확장 시 스크롤 감지 영역이 넓어지도록 너비 조정
+            target_width = max(1297.0, page_w)
+            self.vertical_scroll_stack.width = target_width
+            self.vertical_scroll_content.width = target_width
+            self.vertical_scroll_column.width = target_width
             
             # 8. 변경사항 UI 업데이트 반영
             self.scroll_rail.update()
             self.scroll_rail_bg.update()
             self.scroll_detector.update()
             self.vertical_scroll_content.update()
+            try:
+                self.vertical_scroll_stack.update()
+            except Exception:
+                pass
             try:
                 self.vertical_scroll_column.update()
             except Exception:
