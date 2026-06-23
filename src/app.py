@@ -1560,7 +1560,7 @@ class StockPredictorApp:
         scroll_radio_group = ft.RadioGroup(
             content=ft.Column([
                 ft.Radio(value="scrollbar", label="스크롤바 적용"),
-                ft.Radio(value="wheel", label="마우스 휠로 스크롤")
+                ft.Radio(value="wheel", label="휠스크롤 적용")
             ], spacing=6),
             value=self.scroll_mode
         )
