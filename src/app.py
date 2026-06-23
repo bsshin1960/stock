@@ -1812,10 +1812,28 @@ class StockPredictorApp:
         )
         self.page.show_dialog(dlg)
 
-    # ─── 분석 실행 ───
     def run_analysis(self, e):
         if self._is_running:
             return
+        
+        # Reset dashboard scroll positions to the top at the start of analysis
+        self.scroll_detector.top = 0.0
+        self.vertical_scroll_content.top = 0.0
+        self.last_scroll_offset = 0.0
+        
+        # Reset inner boxes scroll indices to the top
+        self.top10_scroll_index = 0
+        self.kodex_history_scroll_index = 0
+        for mdl in getattr(self, "ai_scroll_indices", {}):
+            self.ai_scroll_indices[mdl] = 0
+            
+        try:
+            self.scroll_detector.update()
+            self.vertical_scroll_content.update()
+            self.apply_scroll_mode_to_inner_boxes()
+        except Exception:
+            pass
+
         self._is_running = True
         self.run_btn.disabled = True
         self.progress_ring.visible = True
