@@ -999,18 +999,17 @@ class StockPredictorApp:
         title_txt = ft.Text(display_name, size=13, weight=ft.FontWeight.BOLD, color="#0F172A")
         
         # Local theme for the horizontal and vertical scrollbars in AI analysis result box
-        scroll_color = "#807E8B9B" if is_dark else "#8078909C"
-        hover_color = "#80C084FC" if is_dark else "#807C3AED"
+        scroll_color = "#50808080" if is_dark else "#40808080"
         local_scrollbar_theme = ft.Theme(
             scrollbar_theme=ft.ScrollbarTheme(
                 thumb_visibility=True,
                 thumb_color={
-                    ft.ControlState.HOVERED: hover_color,
-                    ft.ControlState.DRAGGED: hover_color,
-                    ft.ControlState.PRESSED: hover_color,
+                    ft.ControlState.HOVERED: scroll_color,
+                    ft.ControlState.DRAGGED: scroll_color,
+                    ft.ControlState.PRESSED: scroll_color,
                     ft.ControlState.DEFAULT: scroll_color,
                 },
-                main_axis_margin=0.0, # Sits at the very left of the box (full span)
+                main_axis_margin=71.0, # Reduced track length by 50% (71px margins on both sides of 285px span)
                 thickness=6,
                 radius=3,
             )
