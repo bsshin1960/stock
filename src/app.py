@@ -477,6 +477,7 @@ class StockPredictorApp:
         self.top10_scroll_detector = ft.GestureDetector(
             content=self.top10_viewport,
             on_scroll=self.handle_top10_wheel,
+            on_vertical_drag_update=self.handle_dashboard_touch_drag if self.is_mobile else None,
             height=83
         )
 
@@ -517,6 +518,7 @@ class StockPredictorApp:
         self.kodex_history_scroll_detector = ft.GestureDetector(
             content=self.kodex_history_viewport,
             on_scroll=self.handle_kodex_history_wheel,
+            on_vertical_drag_update=self.handle_dashboard_touch_drag if self.is_mobile else None,
             height=83
         )
 
@@ -916,6 +918,7 @@ class StockPredictorApp:
         self.dashboard_scroll_detector = ft.GestureDetector(
             content=self.vertical_scroll_stack,
             on_scroll=self.handle_dashboard_scroll,
+            on_vertical_drag_update=self.handle_dashboard_touch_drag if self.is_mobile else None,
             expand=True
         )
         self.vertical_scroll_column = ft.Container(
@@ -1006,6 +1009,7 @@ class StockPredictorApp:
         reason_detector = ft.GestureDetector(
             content=reason_viewport,
             on_scroll=lambda e: self.handle_ai_reason_wheel(e, model_name),
+            on_vertical_drag_update=self.handle_dashboard_touch_drag if self.is_mobile else None,
         )
         
         # 4. Horizontal scroll row wrapping the GestureDetector
@@ -2185,6 +2189,40 @@ class StockPredictorApp:
         self.vertical_scroll_content.top = -target_offset
         
         # 6. UI 업데이트
+        try:
+            self.scroll_detector.update()
+            self.vertical_scroll_content.update()
+        except Exception:
+            pass
+
+    def handle_dashboard_touch_drag(self, e: ft.DragUpdateEvent):
+        # 모바일 전용이므로 PC 버전은 철저히 리턴 처리
+        if not self.is_mobile:
+            return
+            
+        # 손가락 드래그 이동량 (y축)
+        delta = e.primary_delta if e.primary_delta is not None else 0.0
+        
+        # 1:1 드래그 스크롤을 위해 target_offset 직접 계산 (손가락을 위로 쓸면 delta < 0 이므로 target_offset 증가)
+        dynamic_max_scroll = getattr(self, "dynamic_max_scroll", 610.0)
+        target_offset = self.last_scroll_offset - delta
+        
+        # 범위 제한 (0 ~ dynamic_max_scroll)
+        if target_offset < 0:
+            target_offset = 0.0
+        elif target_offset > dynamic_max_scroll:
+            target_offset = dynamic_max_scroll
+            
+        self.last_scroll_offset = target_offset
+        self.vertical_scroll_content.top = -target_offset
+        
+        # 가상 스크롤바 핸들 위치 역산
+        allowed_max_top = getattr(self, "allowed_max_top", 550.0)
+        ratio = target_offset / dynamic_max_scroll if dynamic_max_scroll > 0.0 else 0.0
+        new_top = ratio * allowed_max_top
+        self.scroll_detector.top = new_top
+        
+        # UI 업데이트
         try:
             self.scroll_detector.update()
             self.vertical_scroll_content.update()
