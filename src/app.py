@@ -634,6 +634,10 @@ class StockPredictorApp:
         self.news_title_icon = ft.Icon(ft.Icons.ARTICLE_ROUNDED, size=16, color="#C084FC")
         self.news_title_text = ft.Text("실시간 속보 뉴스 (15.0%)", size=13, color="#C084FC", weight=ft.FontWeight.BOLD)
 
+        self.news_scroll_detector = ft.GestureDetector(
+            content=self.news_lv,
+            on_scroll=self.handle_news_wheel,
+        )
         self.news_box = ft.Container(
             content=ft.Column([
                 ft.Row([
@@ -641,7 +645,7 @@ class StockPredictorApp:
                     self.news_title_text,
                 ], spacing=6),
                 ft.Divider(color="#2E3A4E", thickness=1, height=1),
-                ft.Container(content=self.news_lv, expand=True, on_hover=self.handle_scroll_box_hover, bgcolor="#00000000"),
+                ft.Container(content=self.news_scroll_detector, expand=True, on_hover=self.handle_scroll_box_hover, bgcolor="#00000000"),
             ], spacing=4),
             bgcolor="#FFFFFF", padding=12, border_radius=15,
             border=ft.Border.all(1, "#78909C"), width=631, height=140,
@@ -651,6 +655,10 @@ class StockPredictorApp:
         self.rumor_title_icon = ft.Icon(ft.Icons.RECORD_VOICE_OVER, size=16, color="#C084FC")
         self.rumor_title_text = ft.Text("증권가 소문/이슈 (5.0%)", size=13, color="#C084FC", weight=ft.FontWeight.BOLD)
 
+        self.rumors_scroll_detector = ft.GestureDetector(
+            content=self.rumors_lv,
+            on_scroll=self.handle_rumors_wheel,
+        )
         self.rumor_box = ft.Container(
             content=ft.Column([
                 ft.Row([
@@ -658,7 +666,7 @@ class StockPredictorApp:
                     self.rumor_title_text,
                 ], spacing=6),
                 ft.Divider(color="#2E3A4E", thickness=1, height=1),
-                ft.Container(content=self.rumors_lv, expand=True, on_hover=self.handle_scroll_box_hover, bgcolor="#00000000"),
+                ft.Container(content=self.rumors_scroll_detector, expand=True, on_hover=self.handle_scroll_box_hover, bgcolor="#00000000"),
             ], spacing=4),
             bgcolor="#FFFFFF", padding=12, border_radius=15,
             border=ft.Border.all(1, "#78909C"), width=631, height=140,
@@ -672,6 +680,10 @@ class StockPredictorApp:
         self.monitor_title_icon = ft.Icon(ft.Icons.MONITOR_HEART_OUTLINED, size=16, color="#C084FC")
         self.monitor_title_text = ft.Text("모니터링 로그", size=13, color="#C084FC", weight=ft.FontWeight.BOLD)
 
+        self.monitor_scroll_detector = ft.GestureDetector(
+            content=self.monitor_lv,
+            on_scroll=self.handle_monitor_wheel,
+        )
         self.monitor_box = ft.Container(
             content=ft.Column([
                 ft.Row([
@@ -680,7 +692,7 @@ class StockPredictorApp:
                     ft.IconButton(icon=ft.Icons.DELETE_SWEEP_ROUNDED, icon_size=16, icon_color="#8A99AD", tooltip="로그 지우기", on_click=lambda _: self._clear_log()),
                 ], spacing=6),
                 ft.Divider(color="#2E3A4E", thickness=1, height=1),
-                ft.Container(content=self.monitor_lv, expand=True, on_hover=self.handle_scroll_box_hover, bgcolor="#00000000"),
+                ft.Container(content=self.monitor_scroll_detector, expand=True, on_hover=self.handle_scroll_box_hover, bgcolor="#00000000"),
             ], spacing=4),
             bgcolor="#F8FAFC", padding=10, border_radius=12,
             border=ft.Border.all(1, "#455A64"), width=631, height=196,
@@ -694,6 +706,10 @@ class StockPredictorApp:
         self.accuracy_title_icon = ft.Icon(ft.Icons.QUERY_STATS, size=16, color="#C084FC")
         self.accuracy_title_text = ft.Text("예측 적중률 및 분석 이력", size=13, color="#C084FC", weight=ft.FontWeight.BOLD)
 
+        self.accuracy_scroll_detector = ft.GestureDetector(
+            content=self.accuracy_lv,
+            on_scroll=self.handle_accuracy_wheel,
+        )
         self.accuracy_box = ft.Container(
             content=ft.Column([
                 ft.Row([
@@ -705,7 +721,7 @@ class StockPredictorApp:
                     self.accuracy_label,
                 ], alignment=ft.MainAxisAlignment.SPACE_BETWEEN, vertical_alignment=ft.CrossAxisAlignment.CENTER),
                 ft.Divider(color="#2E3A4E", thickness=1, height=1),
-                ft.Container(content=self.accuracy_lv, expand=True, on_hover=self.handle_scroll_box_hover, bgcolor="#00000000"),
+                ft.Container(content=self.accuracy_scroll_detector, expand=True, on_hover=self.handle_scroll_box_hover, bgcolor="#00000000"),
             ], spacing=4),
             bgcolor="#F8FAFC", padding=10, border_radius=12,
             border=ft.Border.all(1, "#455A64"), width=631, height=196,
@@ -1445,6 +1461,42 @@ class StockPredictorApp:
         col.top = -new_idx * item_height
         try:
             col.update()
+        except Exception:
+            pass
+
+    def handle_news_wheel(self, e: ft.ScrollEvent):
+        self.is_box_hovered = True
+        direction = 1.0 if e.scroll_delta.y > 0 else -1.0
+        step = 40.0
+        try:
+            self.news_lv.scroll_to(delta=direction * step)
+        except Exception:
+            pass
+
+    def handle_rumors_wheel(self, e: ft.ScrollEvent):
+        self.is_box_hovered = True
+        direction = 1.0 if e.scroll_delta.y > 0 else -1.0
+        step = 40.0
+        try:
+            self.rumors_lv.scroll_to(delta=direction * step)
+        except Exception:
+            pass
+
+    def handle_monitor_wheel(self, e: ft.ScrollEvent):
+        self.is_box_hovered = True
+        direction = 1.0 if e.scroll_delta.y > 0 else -1.0
+        step = 40.0
+        try:
+            self.monitor_lv.scroll_to(delta=direction * step)
+        except Exception:
+            pass
+
+    def handle_accuracy_wheel(self, e: ft.ScrollEvent):
+        self.is_box_hovered = True
+        direction = 1.0 if e.scroll_delta.y > 0 else -1.0
+        step = 40.0
+        try:
+            self.accuracy_lv.scroll_to(delta=direction * step)
         except Exception:
             pass
 
