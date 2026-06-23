@@ -877,16 +877,11 @@ class StockPredictorApp:
             expand=True
         )
 
-        if self.scroll_mode == "scrollbar":
-            self.vertical_scroll_content.content = body
-            self.scroll_rail.visible = True
-            self.vertical_scroll = self.dashboard_scroll_detector
-            self.vertical_scroll_column.width = 1297
-        else:
-            self.vertical_scroll_column.content.controls = [body]
-            self.scroll_rail.visible = False
-            self.vertical_scroll = self.vertical_scroll_column
-            self.vertical_scroll_column.width = None
+        # Always use the custom gesture scroll stack for absolute stability
+        self.vertical_scroll_content.content = body
+        self.scroll_rail.visible = (self.scroll_mode == "scrollbar")
+        self.vertical_scroll = self.dashboard_scroll_detector
+        self.vertical_scroll_column.width = 1297
 
         # 메뉴바와 세로 본문을 감싸는 대시보드 컬럼
         self.dashboard_column = ft.Column(
@@ -1387,15 +1382,7 @@ class StockPredictorApp:
                 print(f"[Error] Fallback KODEX 200 history failed: {inner_ex}")
 
     def handle_top10_wheel(self, e: ft.ScrollEvent):
-        # Ensure parent dashboard scroll is disabled in wheel mode to prevent double scrolling
-        if self.scroll_mode == "wheel":
-            scroll_col = self.vertical_scroll_column.content
-            if scroll_col and scroll_col.scroll is not None:
-                scroll_col.scroll = None
-                try:
-                    scroll_col.update()
-                except Exception:
-                    pass
+        self.is_box_hovered = True
         import time
         now = time.time()
         if now - getattr(self, "last_top10_scroll_time", 0.0) < 0.15:
@@ -1418,15 +1405,7 @@ class StockPredictorApp:
             pass
 
     def handle_kodex_history_wheel(self, e: ft.ScrollEvent):
-        # Ensure parent dashboard scroll is disabled in wheel mode to prevent double scrolling
-        if self.scroll_mode == "wheel":
-            scroll_col = self.vertical_scroll_column.content
-            if scroll_col and scroll_col.scroll is not None:
-                scroll_col.scroll = None
-                try:
-                    scroll_col.update()
-                except Exception:
-                    pass
+        self.is_box_hovered = True
         import time
         now = time.time()
         if now - getattr(self, "last_kodex_scroll_time", 0.0) < 0.15:
@@ -1449,15 +1428,7 @@ class StockPredictorApp:
             pass
 
     def handle_ai_reason_wheel(self, e: ft.ScrollEvent, model_name: str):
-        # Ensure parent dashboard scroll is disabled in wheel mode to prevent double scrolling
-        if self.scroll_mode == "wheel":
-            scroll_col = self.vertical_scroll_column.content
-            if scroll_col and scroll_col.scroll is not None:
-                scroll_col.scroll = None
-                try:
-                    scroll_col.update()
-                except Exception:
-                    pass
+        self.is_box_hovered = True
         direction = 1 if e.scroll_delta.y > 0 else -1
         visible_count = 5
         reason_lv = self.ai_reason_columns[model_name]
@@ -1636,33 +1607,14 @@ class StockPredictorApp:
             _save_settings({"scroll_mode_mobile": mode})
         else:
             _save_settings({"scroll_mode_pc": mode})
-        body_ctrl = None
-        if self.vertical_scroll_content.content is not None:
-            body_ctrl = self.vertical_scroll_content.content
-        elif len(self.vertical_scroll_column.content.controls) > 0:
-            body_ctrl = self.vertical_scroll_column.content.controls[0]
-        if body_ctrl is None:
-            return
-        if mode == "scrollbar":
-            self.vertical_scroll_column.content.controls.clear()
-            self.vertical_scroll_content.content = body_ctrl
-            self.vertical_scroll_content.top = 0
-            self.scroll_detector.top = 0
-            self.scroll_rail.visible = True
-            self.vertical_scroll = self.dashboard_scroll_detector
-            self.dashboard_column.controls[1] = self.dashboard_scroll_detector
-            self.vertical_scroll_column.width = 1297
-            try:
-                self.update_scroll_dimensions()
-            except Exception:
-                pass
-        else:
-            self.vertical_scroll_content.content = None
-            self.vertical_scroll_column.content.controls = [body_ctrl]
-            self.scroll_rail.visible = False
-            self.vertical_scroll = self.vertical_scroll_column
-            self.dashboard_column.controls[1] = self.vertical_scroll_column
-            self.vertical_scroll_column.width = None
+
+        # Keep custom gesture scroll and toggle scrollbar rail visibility
+        self.scroll_rail.visible = (mode == "scrollbar")
+        
+        try:
+            self.update_scroll_dimensions()
+        except Exception:
+            pass
         try:
             self.apply_scroll_mode_to_inner_boxes()
         except Exception:
@@ -2045,19 +1997,9 @@ class StockPredictorApp:
         # 1. Close menubar dropdowns
         self.handle_body_hover(e)
         
-        # 2. Disable/enable dashboard scroll in wheel mode
-        if self.scroll_mode != "wheel":
-            return
+        # 2. Track box hover state to lock dashboard scroll
         is_hovered = (e.data == "true")
         self.is_box_hovered = is_hovered
-        
-        scroll_col = self.vertical_scroll_column.content
-        if scroll_col:
-            scroll_col.scroll = None if is_hovered else ft.ScrollMode.AUTO
-            try:
-                scroll_col.update()
-            except Exception:
-                pass
 
     def apply_scroll_mode_to_inner_boxes(self):
         # 1. Update Top 10
@@ -2111,7 +2053,8 @@ class StockPredictorApp:
             self.is_menu_open = False
 
     def handle_dashboard_scroll(self, e: ft.ScrollEvent):
-        if self.scroll_mode == "scrollbar":
+        # Prevent dashboard from scrolling when a child box is hovered/scrolled
+        if getattr(self, "is_box_hovered", False):
             return
         # 1. 휠 이벤트의 y 방향 이동 방향 감지
         direction = 1.0 if e.scroll_delta.y > 0 else -1.0
