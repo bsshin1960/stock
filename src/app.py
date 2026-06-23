@@ -2103,7 +2103,7 @@ class StockPredictorApp:
         self.is_menu_open = False
 
     def handle_body_hover(self, e):
-        if e.data == "true":
+        if e.data == "true" and getattr(self, "is_menu_open", False):
             self.menubar.visible = False
             self.page.update()
             self.menubar.visible = True
