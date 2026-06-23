@@ -211,7 +211,7 @@ class StockPredictorApp:
         if is_mobile:
             self.scroll_mode = saved.get("scroll_mode_mobile", "wheel")
         else:
-            self.scroll_mode = saved.get("scroll_mode_pc", "scrollbar")
+            self.scroll_mode = saved.get("scroll_mode_pc", "wheel")
         self.display_mode = saved.get("display_mode", "default")
 
         self.current_data = None
@@ -226,6 +226,8 @@ class StockPredictorApp:
         self.page.run_thread(self.load_charts)
         # 초기 예측 적중률 이력 로딩
         self.page.run_thread(self.load_history_ui)
+        # 주기적 실시간 지수/차트 갱신 타이머 시작
+        self.page.run_thread(self._start_realtime_timer)
 
     def show_snack_bar(self, message: str, color: str = "#00C853"):
         sb = ft.SnackBar(content=ft.Text(message), bgcolor=color)
@@ -244,6 +246,28 @@ class StockPredictorApp:
                 self.kodex_chart.src = f"data:image/png;base64,{kodex_b64}"
             if kospi_b64:
                 self.kospi_chart.src = f"data:image/png;base64,{kospi_b64}"
+            
+            # 실시간 지수/시세 수집 및 UI 텍스트 갱신
+            try:
+                realtime_info = self.data_collector.get_realtime_index_and_kodex()
+                
+                # KOSPI 실시간
+                kospi_rt = realtime_info["KOSPI"]
+                if kospi_rt["value"] is not None:
+                    val_str = f"{kospi_rt['value']:,.2f}"
+                    pct_str = f"{kospi_rt['change_pct']:+.2f}%"
+                    self.kospi_live_text.value = f"{val_str} ({pct_str})"
+                    self.kospi_live_text.color = "#FF1744" if kospi_rt["change_pct"] > 0 else "#2979FF" if kospi_rt["change_pct"] < 0 else "#8A99AD"
+                
+                # KODEX 200 실시간
+                kodex_rt = realtime_info["KODEX200"]
+                if kodex_rt["value"] is not None:
+                    val_str = f"{kodex_rt['value']:,}원"
+                    pct_str = f"{kodex_rt['change_pct']:+.2f}%"
+                    self.kodex_live_text.value = f"{val_str} ({pct_str})"
+                    self.kodex_live_text.color = "#FF1744" if kodex_rt["change_pct"] > 0 else "#2979FF" if kodex_rt["change_pct"] < 0 else "#8A99AD"
+            except Exception as e_live:
+                self._log(f"✘ 실시간 지수 텍스트 갱신 실패: {e_live}")
                 
             self._log("✔ 차트 로딩 완료")
             try:
@@ -533,9 +557,13 @@ class StockPredictorApp:
         # ===== 주가 차트 박스 구성 =====
         self.chart_kodex_title_icon = ft.Icon(ft.Icons.SHOW_CHART, size=16, color="#7C3AED")
         self.chart_kodex_title_text = ft.Text("Kodex200 주가", size=13, color="#7C3AED", weight=ft.FontWeight.BOLD)
+        self.kodex_live_text = ft.Text("", size=12, color="#8A99AD", weight=ft.FontWeight.BOLD)
         self.kodex_chart_box = ft.Container(
             content=ft.Column([
-                ft.Row([self.chart_kodex_title_icon, self.chart_kodex_title_text], spacing=6),
+                ft.Row([
+                    ft.Row([self.chart_kodex_title_icon, self.chart_kodex_title_text], spacing=6),
+                    self.kodex_live_text
+                ], alignment=ft.MainAxisAlignment.SPACE_BETWEEN),
                 ft.Divider(color="#CBD5E1", thickness=1, height=1),
                 ft.Container(content=self.kodex_chart, expand=True, alignment=ft.Alignment(0, 0), padding=0, margin=0)
             ], spacing=4),
@@ -546,9 +574,13 @@ class StockPredictorApp:
 
         self.chart_kospi_title_icon = ft.Icon(ft.Icons.INSIGHTS, size=16, color="#7C3AED")
         self.chart_kospi_title_text = ft.Text("종합 주가 지수", size=13, color="#7C3AED", weight=ft.FontWeight.BOLD)
+        self.kospi_live_text = ft.Text("", size=12, color="#8A99AD", weight=ft.FontWeight.BOLD)
         self.kospi_chart_box = ft.Container(
             content=ft.Column([
-                ft.Row([self.chart_kospi_title_icon, self.chart_kospi_title_text], spacing=6),
+                ft.Row([
+                    ft.Row([self.chart_kospi_title_icon, self.chart_kospi_title_text], spacing=6),
+                    self.kospi_live_text
+                ], alignment=ft.MainAxisAlignment.SPACE_BETWEEN),
                 ft.Divider(color="#CBD5E1", thickness=1, height=1),
                 ft.Container(content=self.kospi_chart, expand=True, alignment=ft.Alignment(0, 0), padding=0, margin=0)
             ], spacing=4),
@@ -3176,12 +3208,16 @@ class StockPredictorApp:
         self.kodex_chart_box.content.controls[1].color = "#2E3A4E" if is_dark else "#CBD5E1"
         self.chart_kodex_title_icon.color = accent_color
         self.chart_kodex_title_text.color = accent_color
+        if self.kodex_live_text.color not in ["#FF1744", "#2979FF"]:
+            self.kodex_live_text.color = text_secondary
         
         self.kospi_chart_box.bgcolor = bg_lower
         self.kospi_chart_box.border = ft.Border.all(1, border_lower)
         self.kospi_chart_box.content.controls[1].color = "#2E3A4E" if is_dark else "#CBD5E1"
         self.chart_kospi_title_icon.color = accent_color
         self.chart_kospi_title_text.color = accent_color
+        if self.kospi_live_text.color not in ["#FF1744", "#2979FF"]:
+            self.kospi_live_text.color = text_secondary
         
         # 우측 가상 스크롤바 색상 업데이트
         self.scroll_handle.bgcolor = "#7E8B9B" if is_dark else "#B0BEC5"
@@ -3728,6 +3764,24 @@ class StockPredictorApp:
             self.page.update()
         except Exception:
             pass
+
+    def _start_realtime_timer(self):
+        """30초 간격으로 실시간 지수 및 차트 데이터를 백그라운드에서 자동 갱신"""
+        import time
+        while True:
+            time.sleep(30)
+            
+            try:
+                if not self.page.client_ip:
+                    break
+            except Exception:
+                break
+                
+            if not self._is_running:
+                try:
+                    self.load_charts()
+                except Exception:
+                    pass
 
 
 def main(page: ft.Page):

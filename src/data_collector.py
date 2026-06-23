@@ -521,6 +521,69 @@ class DataCollector:
             "news": news_and_rumors["news"],
             "rumors": news_and_rumors["rumors"]
         }
+
+    def get_realtime_index_and_kodex(self) -> dict:
+        """네이버 금융 실시간 API를 이용해 KOSPI 지수와 KODEX 200 실시간 시세를 조회하여 반환"""
+        res_data = {
+            "KOSPI": {"value": None, "change_pct": None, "flg": "3"},
+            "KODEX200": {"value": None, "change_pct": None, "flg": "3"}
+        }
+        try:
+            url = "https://polling.finance.naver.com/api/realtime?query=SERVICE_INDEX:KOSPI|SERVICE_ITEM:069500"
+            res = self.session.get(url, timeout=5)
+            if res.status_code == 200:
+                data = res.json()
+                areas = data.get("result", {}).get("areas", [])
+                
+                for area in areas:
+                    name = area.get("name")
+                    datas = area.get("datas", [])
+                    if name == "SERVICE_INDEX":
+                        for item in datas:
+                            if item.get("cd") == "KOSPI":
+                                nv = item.get("nv")
+                                cv = item.get("cv", 0)
+                                cr = item.get("cr", 0.0)
+                                rf = item.get("rf", "3")
+                                if nv is not None:
+                                    val = round(nv * 0.01, 2)
+                                    cr_val = float(cr)
+                                    if rf in ("4", "5"):
+                                        cr_val = -abs(cr_val)
+                                    elif rf in ("1", "2"):
+                                        cr_val = abs(cr_val)
+                                    else:
+                                        cr_val = 0.0
+                                    res_data["KOSPI"] = {
+                                        "value": val,
+                                        "change_pct": round(cr_val, 2),
+                                        "flg": rf
+                                    }
+                    elif name == "SERVICE_ITEM":
+                        for item in datas:
+                            if item.get("cd") == "069500":
+                                nv = item.get("nv")
+                                cv = item.get("cv", 0)
+                                cr = item.get("cr", 0.0)
+                                rf = item.get("rf", "3")
+                                if nv is not None:
+                                    val = int(nv)
+                                    cr_val = float(cr)
+                                    if rf in ("4", "5"):
+                                        cr_val = -abs(cr_val)
+                                    elif rf in ("1", "2"):
+                                        cr_val = abs(cr_val)
+                                    else:
+                                        cr_val = 0.0
+                                    res_data["KODEX200"] = {
+                                        "value": val,
+                                        "change_pct": round(cr_val, 2),
+                                        "flg": rf
+                                    }
+        except Exception as e:
+            print(f"[Warning] 실시간 지수 및 KODEX200 수집 실패: {e}")
+        return res_data
+
     def generate_chart_base64(self, ticker_symbol: str, title: str, is_dark: bool = True) -> str:
         """최근 3개월치 데이터를 기반으로 테마 맞춤 주가 선 차트를 렌더링하여 Base64 인코딩 스트링으로 반환"""
         import io
@@ -558,6 +621,47 @@ class DataCollector:
                     prices.append(prices[-1] * (1.0 + c))
                 prices = prices[1:]
                 df = pd.DataFrame(index=dates, data={"Close": prices})
+            
+            # 실시간 시세 반영 (yfinance 지연 우회)
+            try:
+                realtime_info = self.get_realtime_index_and_kodex()
+                rt_val = None
+                if ticker_symbol == "^KS11":
+                    rt_val = realtime_info["KOSPI"]["value"]
+                elif ticker_symbol == "069500.KS":
+                    rt_val = realtime_info["KODEX200"]["value"]
+                
+                if rt_val is not None:
+                    now_kst = get_kst_now()
+                    today_date = now_kst.date()
+                    
+                    last_date = df.index[-1]
+                    if hasattr(last_date, "date"):
+                        last_date_only = last_date.date()
+                    else:
+                        last_date_only = last_date
+                        
+                    if last_date_only == today_date:
+                        df.loc[df.index[-1], "Close"] = rt_val
+                    elif today_date > last_date_only:
+                        if isinstance(df.index, pd.DatetimeIndex):
+                            new_idx = pd.to_datetime(today_date)
+                            if df.index.tz is not None:
+                                new_idx = new_idx.tz_localize(df.index.tz)
+                        else:
+                            new_idx = today_date
+                        
+                        last_row = df.iloc[-1].copy()
+                        last_row["Close"] = rt_val
+                        if "Open" in last_row:
+                            last_row["Open"] = rt_val
+                        if "High" in last_row:
+                            last_row["High"] = max(last_row["High"], rt_val)
+                        if "Low" in last_row:
+                            last_row["Low"] = min(last_row["Low"], rt_val)
+                        df.loc[new_idx] = last_row
+            except Exception as e_rt:
+                print(f"[Warning] 차트 실시간 갱신 적용 실패 ({ticker_symbol}): {e_rt}")
             
             
             plt.style.use('dark_background' if is_dark else 'default')
